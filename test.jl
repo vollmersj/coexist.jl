@@ -1,8 +1,15 @@
-using PyCall
+using PyCall #env using Conda
 using Test
+
+include("julia/diseaseProg.jl")
+
 py"""
-exec(open('model_COVID_testing_initial.py').read())
+path = "/Users/aa25desh/Downloads/coexit/coexist-julia/test.py" #change path according?
+exec(open(path).read())
 """
+
+intial_state = (nAge = 9, nHS = 8 ,nIso = 4)
+
 @testset "diseaseprog" begin
-    @test  py"sq"(2)==4
+    @test  py"trFunc_diseaseProgression()"==trFunc_diseaseProgression(;intial_state...)
 end

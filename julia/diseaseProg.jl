@@ -119,7 +119,6 @@ function trFunc_diseaseProgression(ageRelativeRecoverySpeed::Array=
 
     #TODO - time to death might be incorrect overall without an extra delay state, especially for young people
     # Non-hospitalised disease progression
-    print(size(trTensor_diseaseProgression[2:end, 1, 2:end, :]))
     for i1 in [1, 2, 4]
         trTensor_diseaseProgression[2:end, i1, 2:end, :] = ageAdjusted_diseaseProgBaseline
     end

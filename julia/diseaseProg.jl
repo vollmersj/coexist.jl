@@ -86,7 +86,7 @@ function trFunc_diseaseProgression(ageRelativeRecoverySpeed::Array=
           0    0      0       0       0        0       0    # from R2
           0    0      0       0       0        0       0    # from D
     ]
-
+    diseaseProgBaseline = transpose(diseaseProgBaseline)
     # TODO can be improved
     # vcat(fill.(x, v)...) ???
     ageAdjusted_diseaseProgBaseline = deepcopy(cat(repeat([diseaseProgBaseline],

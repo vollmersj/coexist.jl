@@ -4,7 +4,9 @@ using Test
 include("julia/diseaseProg.jl")
 
 py"""
-path = "/Users/aa25desh/Downloads/coexit/coexist-julia/test.py" #change path according?
+import os
+relative_path = os.getcwd()
+path = os.path.join(relative_path, 'coexist-julia/test.py')
 exec(open(path).read())
 """
 

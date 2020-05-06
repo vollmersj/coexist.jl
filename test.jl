@@ -10,8 +10,8 @@ path = os.path.join(relative_path, 'coexist-julia/test.py')
 exec(open(path).read())
 """
 
-intial_state = (nAge = 9, nHS = 8 ,nIso = 4)
+initial _state = (nAge = 9, nHS = 8 ,nIso = 4)
 
 @testset "diseaseprog" begin
-    @test  py"trFunc_diseaseProgression()"==trFunc_diseaseProgression(;intial_state...)
+    @test  py"trFunc_diseaseProgression()"==trFunc_diseaseProgression(;initial_state...)
 end

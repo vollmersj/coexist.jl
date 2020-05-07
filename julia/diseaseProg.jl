@@ -162,3 +162,94 @@ function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=nothing,
     return out
 end
 
+
+
+# start of edit
+# Getting Hospitalised
+# ---------------------------------------
+
+# Describe the transitions to-from hospitals
+# Note that this implementation will assume that hospitalisation takes an extra day,
+# due to the discrete nature of the simulation, might need to be re-thought.
+# -> if simulation of a single day is done in multiple steps (first disease progression, then potential hospitalisation),
+#.    then this problem is avoided. Can do the same with testing.
+
+# Further we assume that hospitalisation does not change health state,
+# but if happens in a non-S state, then it persists until R1 or D
+# (this may need to be relaxed for early untested I states, where the hospitalisation is not COVID-related).
+
+# Hospitalisation mainly depends on disease severity
+# Baseline hospitalisation rate (Data from Scotland: https://www.isdscotland.org/Health-Topics/Hospital-Care/Publications/Acute-Hospital-Publication/data-summary/)
+#hospitalisationRateBaseline = 261278./(91.*(5.425*10**6)) # hospitalisation / (period in days * population) -> frac of pop hospitalised per day
+#hospitalisationRecoveryRateBaseline = 1./4.2 # inverse of mean length of stay in days
+
+# Larger data driver approaches, with age distribution, see data_cleaning_R.ipynb for details
+# ageHospitalisationRateBaseline = pd.read_csv('data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv', sep=',').iloc[:,-1].values
+# ageHospitalisationRecoveryRateBaseline = 1./pd.read_csv('data/clean_10641_LoS_age_provider_suppressed.csv', sep=',').iloc[:,-1].values
+
+# Calculate initial hospitalisation (occupancy), that will be used to initialise the model
+# initBaselineHospitalOccupancyEquilibriumAgeRatio = ageHospitalisationRateBaseline/(ageHospitalisationRateBaseline+ageHospitalisationRecoveryRateBaseline)
+
+
+# Take into account the NHS work-force in hospitals that for our purposes count as "hospitalised S" population,
+# also unaffected by quarantine measures
+# ageNhsClinicalStaffPopulationRatio = pd.read_csv('data/clean_nhsclinicalstaff.csv', sep=',').iloc[:,-1].values
+
+# Extra rate of hospitalisation due to COVID-19 infection stages
+# TODO - find / estimate data on this (unfortunately true rates are hard to get due to many unknown cases)
+# Symptom to hospitalisation is 5.76 days on average (Imperial #8)
+
+# infToHospitalExtra = [1e-4, 1e-3, 2e-2, 1e-2]
+
+# We do know at least how age affects these risks:
+
+# For calculations see data_cleaning_py.ipynb, calculations from CHESS dataset as per 05 Apr
+# relativeAdmissionRisk_given_COVID_by_age = [-0.94886625, -0.96332087, -0.86528671, -0.79828999, -0.61535305,
+       # -0.35214767,  0.12567034,  0.85809052,  3.55950368]
+
+# riskOfAEAttandance_by_age = [0.41261361, 0.31560648, 0.3843979 , 0.30475704, 0.26659415,
+       # 0.25203475, 0.24970244, 0.31549102, 0.65181376]
+
+
+
+
+
+# Build the transition tensor from any non-hospitalised state to a hospitalised state
+# (being in home quarantine is assumed to affect only the infection probability [below], not the hospitalisation probability)
+# caseIsolationHospitalisationRateAdjustment = 1.
+
+# This function takes as input the number of people in given age and health state, and in any non-hospitalised state
+# and returns the number of people staying in the same age and health state,
+# but now hospitalised (the rest of people remain in whatever state they were in)
+
+
+function trFunc_HospitalAdmission(
+    ageHospitalisationRateBaseline = nothing,
+    infToHospitalArea::Array = nothing,
+    ageRelativeExtraAdmissionRiskToCovid = nothing;
+    kwargs...
+    )
+    # This tensor will pointwise multiply an nAge x nHS slice of the stateTensor
+    trTensor_HospitalAdmission = zeros((nAge, nHS))
+
+    # because it is how it works in julia
+    trTensor_HospitalAdmission = transpose(trTensor_HospitalAdmission)
+    # check with Aadesh
+    
+    ageAdjusted_infToHospitalExtra = deepcopy(cat(repeat([infToHospitalExtra],nAge)...,dims=3) #Dont know if it is correct..syntax copied from above
+    for ii in range(size(ageAdjusted_infToHospitalExtra)[1])
+        ageAdjusted_infToHospitalExtra[ii, :] = adjustRatesByAge_KeepAverageRate(
+            infToHospitalExtra[ii],
+            ageRelativeAdjustment=ageRelativeExtraAdmissionRiskToCovid
+        )
+    end
+
+    # Add baseline hospitalisation to all non-dead states
+    trTensor_HospitalAdmission[:end, :] .+= reshape(ageHospitalisationRateBaseline, ())
+
+    # Add COVID-caused hospitalisation to all infeted states (TODO: This is a summation fo rates for independent processes, should be correct, but check)
+    trTensor_HospitalAdmission[2:(nI+1), :] .+= ageAdjusted_infToHospitalExtra
+
+    return trTensor_HospitalAdmission
+end
+# end of edit

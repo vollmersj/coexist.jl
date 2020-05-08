@@ -1,4 +1,4 @@
-# Based on England data (CHESS and NHS England)
+#Based on England data (CHESS and NHS England)
 # I want a way to keep this as the "average" disease progression,
 # but modify it such that old people have less favorable outcomes (as observed)
 # But correspondingly I want people at lower risk to have more favorable outcome on average
@@ -27,38 +27,33 @@ end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 
-function trFunc_diseaseProgression(ageRelativeRecoverySpeed::Array=
-                                           ageRelativeRecoverySpeed,
-                caseFatalityRatioHospital_given_COVID_by_age::Array=
-                        caseFatalityRatioHospital_given_COVID_by_age,
-                        relativeDeathRisk_given_COVID_by_age::Array=
-                               relativeDeathRisk_given_COVID_by_age,
-                                          agePopulationRatio::Array=
-                                                  agePopulationRatio,
-                                          agePopulationTotal::Array=
-                                                  agePopulationTotal,
-                                nonsymptomatic_ratio::Float64 = 0.86,
+function trFunc_diseaseProgression(
+         ageRelativeRecoverySpeed::Array =
+         ageRelativeRecoverySpeed,
+         caseFatalityRatioHospital_given_COVID_by_age::Array=
+         caseFatalityRatioHospital_given_COVID_by_age,
+         nonsymptomatic_ratio::Float64 = 0.86,
                                    # number of days between measurable events
-                                   infect_to_symptoms::Float64 = 5.0,
+         infect_to_symptoms::Float64 = 5.0,
                                    #symptom_to_death = 16.;
-                                  symptom_to_recovery::Float64= 10.0, # 20.5; #unrealiticly long for old people
-                          symptom_to_hospitalisation::Float64 = 5.76,
-                        hospitalisation_to_recovery::Float64 = 14.51,
-                                       IgG_formation::Float64 = 15.0,
+         symptom_to_recovery::Float64= 10.0, # 20.5; #unrealiticly long for old people
+         symptom_to_hospitalisation::Float64 = 5.76,
+         hospitalisation_to_recovery::Float64 = 14.51,
+         IgG_formation::Float64 = 15.0,
                                    # Age related parameters
                                    # for now we'll assume that all hospitalised cases are known (overall 23% of hospitalised COVID patients die. 9% overall case fatality ratio)
                                    # Unknown rates to estimate
-                                 nonsymp_to_recovery::Float64 = 15.0,
-                                      inverse_IS1_IS2::Float64 = 4.0;
-                                                            kwargs...)
+         nonsymp_to_recovery::Float64 = 15.0,
+         inverse_IS1_IS2::Float64 = 4.0;
+         kwargs...)
     # Now we have all the information to build the age-aware multistage SIR model transition matrix
     # The full transition tensor is a sparse map from the Age x HealthState x isolation state to HealthState,
     # and thus is a 4th order tensor itself, representing a linear mapping
     # from "number of people aged A in health state B and isolation state C to health state D.
-    agePopulationRatio = _agePopulationRatio(agePopulationTotal)
+    #agePopulationRatioByTotal = _agePopulationRatio(agePopulationTotal)
     nAge, nHS, nIso = kwargs[:nAge], kwargs[:nHS], kwargs[:nIso]
+    #relativeDeathRisk_given_COVID_by_age = [:relativeDeathRisk_given_COVID_by_age]
     trTensor_diseaseProgression = zeros((nHS, nIso, nHS, nAge))
-    print(size(trTensor_diseaseProgression))
     # Use basic parameters to regularise inputs
     E_IS1 = 1.0/infect_to_symptoms
     # Numbers nonsymptomatic is assumed to be 86% -> E->IN / E-IS1 = 0.86/0.14
@@ -86,12 +81,12 @@ function trFunc_diseaseProgression(ageRelativeRecoverySpeed::Array=
           0    0      0       0       0        0       0    # from R2
           0    0      0       0       0        0       0    # from D
     ]
+
     diseaseProgBaseline = transpose(diseaseProgBaseline)
     # TODO can be improved
     # vcat(fill.(x, v)...) ???
     ageAdjusted_diseaseProgBaseline = deepcopy(cat(repeat([diseaseProgBaseline],
                                                               nAge)..., dims=3))
-    println(size(ageAdjusted_diseaseProgBaseline))
     # Modify all death and R1 rates:
     for ii in range(1, stop = size(ageAdjusted_diseaseProgBaseline)[2])
         # Adjust death rate by age dependent disease severity  ??? check the key args
@@ -136,15 +131,17 @@ end
 #agePopulationTotal *= 55.98/66.27 # (google england/uk population 2018, assuming age dist is similar)
 #agePopulationRatio = agePopulationTotal/sum(agePopulationTotal)
 
+agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 
-function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=nothing,
+function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=agePopulationRatio,
                                                 ageRelativeAdjustment::Array=nothing,
                                                 maxOutRate::Float64=10.0)
     if rate == 0
         return fill(0, size(ageRelativeAdjustment))
     end
     if rate >= maxOutRate
-        @warn("somthing 1")
+        @warn("covidTesting::adjustRatesByAge_KeepAverageRate Input rate $rate >
+                     maxOutRate $maxOutRate, returning input rates")
         return rate*(fill(1, size(ageRelativeAdjustment)))
     end
     out = fill(0, size(ageRelativeAdjustment))
@@ -153,7 +150,9 @@ function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=nothing,
         corrFactor = sum(agePopulationRatio ./ (1 .+ ageRelativeAdjustment))
         out =  rate * (1 .+ ageRelativeAdjustment) * corrFactor
         if sum(out .>= maxOutRate) > 0
-            @warn("something 2")
+            @warn("covidTesting::adjustRatesByAge_KeepAverageRate Adjusted rate
+                   larger than $maxOutRate encountered, reducing ageAdjustment
+                   variance by 10%")
             tmp_mean = sum(ageRelativeAdjustment)/length(ageRelativeAdjustment)
             ageRelativeAdjustment = tmp_mean .+ sqrt(0.9)*(
                                             ageRelativeAdjustment .- tmp_mean)
@@ -162,94 +161,36 @@ function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=nothing,
     return out
 end
 
+#ageHospitalisationRateBaseline
 
+infToHospitalExtra = Array([1e-4, 1e-3, 2e-2, 1e-2])
 
-# start of edit
-# Getting Hospitalised
-# ---------------------------------------
-
-# Describe the transitions to-from hospitals
-# Note that this implementation will assume that hospitalisation takes an extra day,
-# due to the discrete nature of the simulation, might need to be re-thought.
-# -> if simulation of a single day is done in multiple steps (first disease progression, then potential hospitalisation),
-#.    then this problem is avoided. Can do the same with testing.
-
-# Further we assume that hospitalisation does not change health state,
-# but if happens in a non-S state, then it persists until R1 or D
-# (this may need to be relaxed for early untested I states, where the hospitalisation is not COVID-related).
-
-# Hospitalisation mainly depends on disease severity
-# Baseline hospitalisation rate (Data from Scotland: https://www.isdscotland.org/Health-Topics/Hospital-Care/Publications/Acute-Hospital-Publication/data-summary/)
-#hospitalisationRateBaseline = 261278./(91.*(5.425*10**6)) # hospitalisation / (period in days * population) -> frac of pop hospitalised per day
-#hospitalisationRecoveryRateBaseline = 1./4.2 # inverse of mean length of stay in days
-
-# Larger data driver approaches, with age distribution, see data_cleaning_R.ipynb for details
-# ageHospitalisationRateBaseline = pd.read_csv('data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv', sep=',').iloc[:,-1].values
-# ageHospitalisationRecoveryRateBaseline = 1./pd.read_csv('data/clean_10641_LoS_age_provider_suppressed.csv', sep=',').iloc[:,-1].values
-
-# Calculate initial hospitalisation (occupancy), that will be used to initialise the model
-# initBaselineHospitalOccupancyEquilibriumAgeRatio = ageHospitalisationRateBaseline/(ageHospitalisationRateBaseline+ageHospitalisationRecoveryRateBaseline)
-
-
-# Take into account the NHS work-force in hospitals that for our purposes count as "hospitalised S" population,
-# also unaffected by quarantine measures
-# ageNhsClinicalStaffPopulationRatio = pd.read_csv('data/clean_nhsclinicalstaff.csv', sep=',').iloc[:,-1].values
-
-# Extra rate of hospitalisation due to COVID-19 infection stages
-# TODO - find / estimate data on this (unfortunately true rates are hard to get due to many unknown cases)
-# Symptom to hospitalisation is 5.76 days on average (Imperial #8)
-
-# infToHospitalExtra = [1e-4, 1e-3, 2e-2, 1e-2]
-
-# We do know at least how age affects these risks:
-
-# For calculations see data_cleaning_py.ipynb, calculations from CHESS dataset as per 05 Apr
-# relativeAdmissionRisk_given_COVID_by_age = [-0.94886625, -0.96332087, -0.86528671, -0.79828999, -0.61535305,
-       # -0.35214767,  0.12567034,  0.85809052,  3.55950368]
-
-# riskOfAEAttandance_by_age = [0.41261361, 0.31560648, 0.3843979 , 0.30475704, 0.26659415,
-       # 0.25203475, 0.24970244, 0.31549102, 0.65181376]
-
-
-
-
-
-# Build the transition tensor from any non-hospitalised state to a hospitalised state
-# (being in home quarantine is assumed to affect only the infection probability [below], not the hospitalisation probability)
-# caseIsolationHospitalisationRateAdjustment = 1.
-
-# This function takes as input the number of people in given age and health state, and in any non-hospitalised state
-# and returns the number of people staying in the same age and health state,
-# but now hospitalised (the rest of people remain in whatever state they were in)
-
-
+relativeAdmissionRisk_given_COVID_by_age = [-0.94886625, -0.96332087, -0.86528671,
+                                           -0.79828999, -0.61535305, -0.35214767,
+                                            0.12567034,  0.85809052,  3.55950368]
+kwargs = []
 function trFunc_HospitalAdmission(
-    ageHospitalisationRateBaseline = nothing,
-    infToHospitalArea::Array = nothing,
-    ageRelativeExtraAdmissionRiskToCovid = nothing;
-    kwargs...
-    )
-    # This tensor will pointwise multiply an nAge x nHS slice of the stateTensor
-    trTensor_HospitalAdmission = zeros((nAge, nHS))
-
-    # because it is how it works in julia
-    trTensor_HospitalAdmission = transpose(trTensor_HospitalAdmission)
-    # check with Aadesh
-    
-    ageAdjusted_infToHospitalExtra = deepcopy(cat(repeat([infToHospitalExtra],nAge)...,dims=3) #Dont know if it is correct..syntax copied from above
-    for ii in range(size(ageAdjusted_infToHospitalExtra)[1])
+         ageHospitalisationRateBaseline::Array=
+         ageHospitalisationRateBaseline,
+         infToHospitalExtra::Array=infToHospitalExtra,
+         ageRelativeExtraAdmissionRiskToCovid::Array=
+         relativeAdmissionRisk_given_COVID_by_age;
+         kwargs...
+         )
+    trTensor_HospitalAdmission = zeros((nHS, nAge))
+    ageAdjusted_infToHospitalExtra = deepcopy(cat(repeat([infToHospitalExtra],
+                                                             nAge)..., dims=3))
+    for ii in range(1, stop = size(ageAdjusted_infToHospitalExtra)[2])
         ageAdjusted_infToHospitalExtra[ii, :] = adjustRatesByAge_KeepAverageRate(
-            infToHospitalExtra[ii],
-            ageRelativeAdjustment=ageRelativeExtraAdmissionRiskToCovid
-        )
+                                                         infToHospitalExtra[ii],
+                     ageRelativeAdjustment=vageRelativeExtraAdmissionRiskToCovid
+                    )
     end
-
     # Add baseline hospitalisation to all non-dead states
-    trTensor_HospitalAdmission[:end, :] .+= reshape(ageHospitalisationRateBaseline, ())
-
-    # Add COVID-caused hospitalisation to all infeted states (TODO: This is a summation fo rates for independent processes, should be correct, but check)
-    trTensor_HospitalAdmission[2:(nI+1), :] .+= ageAdjusted_infToHospitalExtra
-
+    trTensor_HospitalAdmission[:end, :] .+= reshape(ageHospitalisationRateBaseline,
+                                            (1, size(ageHospitalisationRateBaseline)...))
+    # Add COVID-caused hospitalisation to all infeted states
+    #(TODO: This is a summation fo rates for independent processes, should be correct, but check)
+    trTensor_HospitalAdmission[2:(nI+2), :] .+= ageAdjusted_infToHospitalExtra
     return trTensor_HospitalAdmission
 end
-# end of edit

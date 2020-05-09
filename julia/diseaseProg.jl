@@ -1,7 +1,6 @@
 # Library Imports
 using DataFrames
-using CSV
-
+using CSVFiles
 #Based on England data (CHESS and NHS England)
 # I want a way to keep this as the "average" disease progression,
 # but modify it such that old people have less favorable outcomes (as observed)
@@ -166,27 +165,27 @@ function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=agePopulation
     return out
 end
 
-
 # Getting Hospitalised
 # -----------------------------------
 #ageHospitalisationRateBaseline
 
 # Larger data driver approaches, with age distribution, see data_cleaning_R.ipynb for details
-ageHospitalisationRateBaseline = DataFrame(CSV.File("../data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv"))[:, end]
-ageHospitalisationRateBaseline = convert(Array, ageHospitalisationRateBaseline)
-ageHospitalisationRecoveryRateBaseline = DataFrame(CSV.File("../data/clean_10641_LoS_age_provider_suppressed.csv"))[:,end]
-ageHospitalisationRecoveryRateBaseline = convert(Array, ageHospitalisationRecoveryRateBaseline)
+
+ageHospitalisationRateBaseline = DataFrame(load(joinpath(pwd(),
+ "data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv")))[:, end]
+ageHospitalisationRecoveryRateBaseline = DataFrame(load(joinpath(pwd(),
+ "data/clean_10641_LoS_age_provider_suppressed.csv")))[:, end]
 ageHospitalisationRecoveryRateBaseline = 1.0 ./ ageHospitalisationRecoveryRateBaseline
 
 # Calculate initial hospitalisation (occupancy), that will be used to initialise the model
 initBaselineHospitalOccupancyEquilibriumAgeRatio = ageHospitalisationRateBaseline ./
-                                                    (ageHospitalisationRateBaseline+
-                                                    ageHospitalisationRecoveryRateBaseline)
+                                                    (ageHospitalisationRateBaseline +
+                                                    ageHospitalisationRecoveryRateBaseline) #? check the calculations
 
 # Take into account the NHS work-force in hospitals that for our purposes count
 # as "hospitalised S" population, also unaffected by quarantine measures
-ageNhsClinicalStaffPopulationRatio = DataFrame(CSV.File("../data/clean_nhsclinicalstaff.csv"))[:,end]
-ageNhsClinicalStaffPopulationRatio = convert(Array, ageNhsClinicalStaffPopulationRatio)
+ageNhsClinicalStaffPopulationRatio = DataFrame(load(joinpath(pwd(),
+      "data/clean_nhsclinicalstaff.csv")))[:,end]
 
 # Extra rate of hospitalisation due to COVID-19 infection stages
 # TODO - find / estimate data on this (unfortunately true rates are hard to get due to many unknown cases)

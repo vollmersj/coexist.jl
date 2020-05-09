@@ -192,7 +192,7 @@ def trFunc_diseaseProgression(
     trTensor_diseaseProgression[:,1:,2,1:] = ageAdjusted_diseaseProgBaseline_Hospital
 
 
-    return np.transpose(trTensor_diseaseProgression)
+    return trTensor_diseaseProgression
 
 # Larger data driver approaches, with age distribution, see data_cleaning_R.ipynb for details
 ageHospitalisationRateBaseline = pd.read_csv('data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv', sep=',').iloc[:,-1].values

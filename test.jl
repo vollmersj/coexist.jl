@@ -17,4 +17,6 @@ initial_state = (nAge=9, nHS=8, nIso=4, nI=4)
 	trFunc_diseaseProgression(;initial_state...)
 	@test py"np.transpose(trFunc_HospitalAdmission())"≈ # Approximate equality?
 	trFunc_HospitalAdmission(;initial_state...)
+	@test py"np.transpose(trFunc_HospitalDischarge())"≈ 
+	trFunc_HospitalDischarge(;initial_state...)
 end

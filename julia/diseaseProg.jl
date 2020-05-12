@@ -202,7 +202,6 @@ riskOfAEAttandance_by_age = [0.41261361, 0.31560648, 0.3843979 ,
                              0.30475704, 0.26659415,0.25203475,
                              0.24970244, 0.31549102, 0.65181376]
 
-kwargs = []
 function trFunc_HospitalAdmission(
          ageHospitalisationRateBaseline::Array=
          ageHospitalisationRateBaseline,
@@ -231,4 +230,24 @@ function trFunc_HospitalAdmission(
     #(TODO: This is a summation fo rates for independent processes, should be correct, but check)
     trTensor_HospitalAdmission[2:(nI+1), :] .+= ageAdjusted_infToHospitalExtra
     return trTensor_HospitalAdmission
+end
+
+function trFunc_HospitalDischarge(
+    ageHospitalisationRecoveryRateBaseline::Array=
+    ageHospitalisationRecoveryRateBaseline,
+    dischargeDueToCovidRateMultiplier::Float64=3.0;
+    kwargs...
+    )
+    nAge, nHS = kwargs[:nAge], kwargs[:nHS]
+    trTensor_HospitalDischarge = zeros((nHS, nAge))
+    # Baseline discharges apply to all non-symptomatic patients (TODO: take into account testing state!)
+    trTensor_HospitalDischarge[1:3, :] .+= transpose(
+                                     ageHospitalisationRecoveryRateBaseline) 
+
+    # No discharges for COVID symptomatic people from the hospital until they recover
+    # TODO - check with health experts if this is correct assumption; probably also depends on testing state
+    trTensor_HospitalDischarge[4:5, :] .= 0.0
+    trTensor_HospitalDischarge[6:7, :] .= dischargeDueToCovidRateMultiplier .*
+                            transpose(ageHospitalisationRecoveryRateBaseline)
+    return trTensor_HospitalDischarge
 end

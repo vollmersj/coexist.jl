@@ -256,3 +256,23 @@ def trFunc_HospitalAdmission(
     trTensor_HospitalAdmission[:,1:(nI+1)] += ageAdjusted_infToHospitalExtra
 
     return trTensor_HospitalAdmission
+
+
+def trFunc_HospitalDischarge(
+    ageHospitalisationRecoveryRateBaseline = ageHospitalisationRecoveryRateBaseline,
+    dischargeDueToCovidRateMultiplier = 3.,
+
+    **kwargs
+    ):
+
+    trTensor_HospitalDischarge = np.zeros((nAge, nHS))
+
+    # Baseline discharges apply to all non-symptomatic patients (TODO: take into account testing state!)
+    trTensor_HospitalDischarge[:, :3] += ageHospitalisationRecoveryRateBaseline[:,np.newaxis]
+
+    # No discharges for COVID symptomatic people from the hospital until they recover
+    # TODO - check with health experts if this is correct assumption; probably also depends on testing state
+    trTensor_HospitalDischarge[:, 3:5] = 0.
+    trTensor_HospitalDischarge[:, 5:7] = dischargeDueToCovidRateMultiplier * ageHospitalisationRecoveryRateBaseline[:,np.newaxis]
+
+    return trTensor_HospitalDischarge

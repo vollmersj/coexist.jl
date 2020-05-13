@@ -361,3 +361,51 @@ end
             axis = (1,2))
         return ageIsoContractionRate/np.sum(stateTensor) # Normalise the rate by total population
     end
+
+function einsum(str, a, b)
+    if str=="ijl,j->i"
+        return _einsum1(a, b)
+    end
+    if str=="ijk,j->ik"
+        return _einsum2(a, b)
+    end
+    if str=="ijkl,j->i"
+        return _einsum3(a, b)
+    end
+end
+
+function _einsum1(a, b) #'ijl,j->i'
+    x = size(a)[1]
+    y = size(a)[2]
+    p = 0
+    for j=1:x
+        for k=1:y
+            p += dot(a[j,:,k], b)
+        end
+    end
+    return p
+end
+
+function _einsum2(a, b)#'ijk,j->ik'
+    x = size(a)[1]
+    y = size(a)[2]
+    p = Array{Float64}(undef,x,y)
+    for j=1:x
+        for k=1:y
+            p[j,k] = dot(a[j,:,k], b)
+        end
+    end
+    return p
+end
+
+function _einsum3(a, b)#'ijkl,j->i'
+    y = size(a)[2]
+    z = size(a)[4]
+    p = 0
+    for j=1:y
+        for k=1:z
+           p += sum(a[:,j,:,k]*b)
+        end
+    end
+    return p
+end

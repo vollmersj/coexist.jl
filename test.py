@@ -276,3 +276,109 @@ def trFunc_HospitalDischarge(
     trTensor_HospitalDischarge[:, 5:7] = dischargeDueToCovidRateMultiplier * ageHospitalisationRecoveryRateBaseline[:,np.newaxis]
 
     return trTensor_HospitalDischarge
+
+ageSocialMixingBaseline = pd.read_csv('data/socialcontactdata_UK_Mossong2008_social_contact_matrix.csv', sep=',').iloc[:,1:].values
+
+
+ageSocialMixingBaseline = (ageSocialMixingBaseline+ageSocialMixingBaseline.T)/2.
+
+ageSocialMixingDistancing = pd.read_csv('data/socialcontactdata_UK_Mossong2008_social_contact_matrix_with_distancing.csv', sep=',').iloc[:,1:].values
+
+ageSocialMixingDistancing = (ageSocialMixingDistancing+ageSocialMixingDistancing.T)/2.
+
+ageSocialMixingIsolation = np.zeros_like(ageSocialMixingBaseline)
+
+elevatedMixingRatioInHospital = 3.0
+
+withinHospitalSocialMixing = elevatedMixingRatioInHospital * np.sum(np.dot(agePopulationRatio, ageSocialMixingBaseline))
+
+transmissionInfectionStage = np.array([0.001, 0.1, 0.6, 0.5])
+
+def trFunc_newInfections_Complete(
+    stateTensor,
+    policySocialDistancing, # True / False, no default because it's important to know which one we use at any moment!
+    policyImmunityPassports, # True / False, no default because it's important to know which one we use at any moment!
+    ageSocialMixingBaseline = ageSocialMixingBaseline,
+    ageSocialMixingDistancing = ageSocialMixingDistancing,
+    ageSocialMixingIsolation = ageSocialMixingIsolation,
+    withinHospitalSocialMixing = withinHospitalSocialMixing,
+    transmissionInfectionStage = transmissionInfectionStage,
+
+    **kwargs
+):
+
+    ageIsoContractionRate = np.zeros((nAge, nIso, nTest))
+
+
+    # Add non-hospital infections
+    #--------------------------------
+
+    curNonIsolatedSocialMixing = ageSocialMixingDistancing if policySocialDistancing else ageSocialMixingBaseline
+
+    # Add baseline interactions only between non-isolated people
+    for k1 in [0,3]:
+        for k2 in [0,3]:
+            ageIsoContractionRate[:,k1,:] += np.expand_dims(
+                np.matmul(
+                    curNonIsolatedSocialMixing,
+                    np.einsum('ijl,j->i',
+                        stateTensor[:,1:(nI+1),k2,:], transmissionInfectionStage) # all infected in non-isolation
+                ),
+                axis=1
+            )
+
+    if policyImmunityPassports:
+        # If the immunity passports policy is on, everyone who tested antibody positive, can roam freely
+        # Therefore replace the interactions between people with testingState = 2 with ageSocialMixingBaseline
+        # we do this by using the distributive property of matrix multiplication, and adding extra interactions
+        # "ageSocialMixingBaseline"-"curNonIsolatedSocialMixing" with each other (this is zero if no social distancing!)
+        # TODO - this is a bit hacky?, but probably correct - double check though!
+        for k1 in [0,3]:
+            for k2 in [0,3]:
+                ageIsoContractionRate[:,k1,2:] += np.matmul(
+                        ageSocialMixingBaseline-curNonIsolatedSocialMixing,
+                        np.einsum('ijk,j->ik',
+                            stateTensor[:,1:(nI+1),k2,2:], transmissionInfectionStage) # all infected in non-isolation
+                    )
+
+    # Add isolation interactions only between isolated and non-isolated people
+    # non-isolated contracting it from isolated
+    for k1 in [0,3]:
+        ageIsoContractionRate[:,k1,:] += np.expand_dims(
+            np.matmul(
+                ageSocialMixingIsolation,
+                np.einsum('ijl,j->i',
+                    stateTensor[:,1:(nI+1),1,:], transmissionInfectionStage) # all infected in isolation
+            ),
+            axis=1
+        )
+
+    # isolated contracting it from non-isolated
+    for k1 in [0,3]:
+        ageIsoContractionRate[:,1,:] += np.expand_dims(
+            np.matmul(
+                ageSocialMixingIsolation,
+                np.einsum('ijl,j->i',
+                    stateTensor[:,1:(nI+1),k1,:], transmissionInfectionStage) # all infected in non-hospital, non-isolation
+            ),
+            axis = 1
+        )
+
+        # isolated cannot contracting it from another isolated
+
+
+    # Add in-hospital infections (of hospitalised patients, and staff)
+    #--------------------------------
+    # (TODO - within hospitals we probably want to take into effect the testing state;
+    #      tested people are better isolated and there's less mixing)
+
+    ageIsoContractionRate[:,2:,:] += np.expand_dims(
+            withinHospitalSocialMixing *
+            np.einsum('ijkl,j->i',
+                stateTensor[:,1:(nI+1),2:,:], transmissionInfectionStage), # all infected in hospital (sick or working)
+        axis = (1,2))
+
+
+    return ageIsoContractionRate/np.sum(stateTensor) # Normalise the rate by total population
+
+

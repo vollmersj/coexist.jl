@@ -12,7 +12,7 @@ relativeDeathRisk_given_COVID_by_age = [-0.99742186, -0.99728639, -0.98158438,
                                         -0.9830432 , -0.82983414, -0.84039294,
                                          0.10768979,  0.38432409,  5.13754904]
 nTest, nIso, nHS, nAge = 4, 4, 8, 9
-stateTensor = zeros((nTest, nIso, nHS, nAge))
+stateTensor = ones((nTest, nIso, nHS, nAge))
 #ageRelativeDiseaseSeverity = np.array([-0.8, -0.6, -0.3, -0.3, -0.1, 0.1, 0.35, 0.4, 0.5])
 # FIXED (above) - this is a guess, find data and fix
 #ageRelativeRecoverySpeed = np.array([0.2]*5+[-0.1, -0.2, -0.3, -0.5])
@@ -267,7 +267,7 @@ ageSocialMixingBaseline = (ageSocialMixingBaseline.+ageSocialMixingBaseline')/2.
 ageSocialMixingDistancing = DataFrame(load(joinpath(pwd(),
 "data/socialcontactdata_UK_Mossong2008_social_contact_matrix_with_distancing.csv")))[:,2:end]
 ageSocialMixingDistancing = convert(Matrix, ageSocialMixingDistancing)
-ageSocialMixingDistancing = (ageSocialMixingDistancing+ageSocialMixingDistancing')/2.0
+ageSocialMixingDistancing = (ageSocialMixingDistancing.+ageSocialMixingDistancing')/2.0
 
 ageSocialMixingIsolation = fill(0, size(ageSocialMixingBaseline))
 
@@ -314,16 +314,15 @@ function trFunc_newInfections_Complete(
          kwargs...
          )
 
-    nTest, nIso, nHS, nAge = 4, 4, 8, 9 #? there seem to be difference in initial_state check it on latter
-    nI = 4
+    nTest, nIso, nHS, nAge, nI = kwargs[:nTest], kwargs[:nIso], kwargs[:nHS],
+                                 kwargs[:nAge] , kwargs[:nI]
     ageIsoContractionRate = zeros((nTest, nIso, nAge))
     # Add non-hospital infections
     #--------------------------------
-    curNonIsolatedSocialMixing = policySocialDistancing ? ageSocialMixingDistancing :
-                                                          ageSocialMixingBaseline
+    curNonIsolatedSocialMixing = policySocialDistancing ? ageSocialMixingDistancing : ageSocialMixingBaseline
     # Add baseline interactions only between non-isolated people
-    for k1 in 1:4
-        for k2 in 1:4
+    for k1 in [1, 4]
+        for k2 in [1, 4]
             ageIsoContractionRate[:,k1,:] .+= reshape(
                   ( einsum("ijl,j->i",
                     stateTensor[:,k2,2:(nI+1),:], transmissionInfectionStage) * # all infected in non-isolation
@@ -339,8 +338,8 @@ function trFunc_newInfections_Complete(
         # we do this by using the distributive property of matrix multiplication, and adding extra interactions
         # "ageSocialMixingBaseline"-"curNonIsolatedSocialMixing" with each other (this is zero if no social distancing!)
         # TODO - this is a bit hacky?, but probably correct - double check though!
-        for k1 in 1:4
-            for k2 in 1:4
+        for k1 in [1, 4]
+            for k2 in [1, 4]
                 ageIsoContractionRate[3:end,k1,:] .+=
                          einsum("ijk,j->ik",
                          stateTensor[3:end,k2,2:(nI+1),:], transmissionInfectionStage) # all infected in non-isolation
@@ -350,7 +349,7 @@ function trFunc_newInfections_Complete(
     end
     # Add isolation interactions only between isolated and non-isolated people
     # non-isolated contracting it from isolated
-    for k1 in 1:4
+    for k1 in [1, 4]
         ageIsoContractionRate[:,k1,:] .+= reshape(
               (einsum("ijl,j->i",
                stateTensor[:,2,2:(nI+1),:], transmissionInfectionStage) # all infected in isolation
@@ -360,7 +359,7 @@ function trFunc_newInfections_Complete(
         )
     end
     # isolated contracting it from non-isolated
-    for k1 in 1:4
+    for k1 in [1, 4]
         ageIsoContractionRate[:,1,:] .+= reshape(
                (einsum("ijl,j->i",
                 stateTensor[:,k1,2:(nI+1),:], transmissionInfectionStage) # all infected in non-hospital, non-isolation
@@ -369,7 +368,6 @@ function trFunc_newInfections_Complete(
             (1, size(ageSocialMixingIsolation )[1]...)
         )
     end
-    print(ageIsoContractionRate)
         # isolated cannot contracting it from another isolated
     # Add in-hospital infections (of hospitalised patients, and staff)
     #--------------------------------
@@ -381,7 +379,6 @@ function trFunc_newInfections_Complete(
                  stateTensor[:,3:end,2:(nI+1),:], transmissionInfectionStage), # all infected in hospital (sick or working)
         (1, 1, size(stateTensor)[end]...)
         )
-
     return ageIsoContractionRate/sum(stateTensor) # Normalise the rate by total population
 end
 

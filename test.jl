@@ -10,7 +10,7 @@ path = os.path.join(relative_path, 'test.py')
 exec(open(path).read())
 """
 
-initial_state = (nAge=9, nHS=8, nIso=4, nI=4)
+initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4)
 
 @testset "DiseaseProg & HospitalAdmission" begin
     @test  py"np.transpose(trFunc_diseaseProgression())"==
@@ -19,8 +19,10 @@ initial_state = (nAge=9, nHS=8, nIso=4, nI=4)
 	trFunc_HospitalAdmission(;initial_state...)
 	@test py"np.transpose(trFunc_HospitalDischarge())"≈
 	trFunc_HospitalDischarge(;initial_state...)
-	#@test py"np.transpose(trFunc_newInfections_Complete(stateTensor=stateTensor,
-	#policySocialDistancing=True, policyImmunityPassports=True))"==
-	#trFunc_newInfections_Complete(stateTensor,true,
-	#true)
+	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
+	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
+	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,1,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈
+	py"np.matmul(ageSocialMixingBaseline-ageSocialMixingDistancing,np.einsum('ijk,j->ik',stateTensor[:,1:(4+1),0,2:], transmissionInfectionStage))"
+	@test py"trFunc_newInfections_Complete(stateTensor=stateTensor,policySocialDistancing=False, policyImmunityPassports=True)"≈
+	permutedims(trFunc_newInfections_Complete(stateTensor,false,true;initial_state...),[3,2,1])
 end

@@ -50,7 +50,7 @@ nIso = 4 # None/distancing, Case isolation, Hospitalised, Hospital staff
 nTest = 4 # untested/negative, Virus positive, Antibody positive, Both positive
 
 
-stateTensor = np.zeros((nAge, nHS, nIso, nTest))
+stateTensor = np.ones((nAge, nHS, nIso, nTest))
 
 
 # Population (data from Imperial #13 ages.csv/UK)
@@ -340,7 +340,6 @@ def trFunc_newInfections_Complete(
                         np.einsum('ijk,j->ik',
                             stateTensor[:,1:(nI+1),k2,2:], transmissionInfectionStage) # all infected in non-isolation
                     )
-
     # Add isolation interactions only between isolated and non-isolated people
     # non-isolated contracting it from isolated
     for k1 in [0,3]:
@@ -352,7 +351,6 @@ def trFunc_newInfections_Complete(
             ),
             axis=1
         )
-
     # isolated contracting it from non-isolated
     for k1 in [0,3]:
         ageIsoContractionRate[:,1,:] += np.expand_dims(
@@ -380,5 +378,3 @@ def trFunc_newInfections_Complete(
 
 
     return ageIsoContractionRate/np.sum(stateTensor) # Normalise the rate by total population
-
-

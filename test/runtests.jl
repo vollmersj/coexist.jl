@@ -1,7 +1,7 @@
-using PyCall #env using Conda
+using coexist, PyCall#env using Conda
 using Test
 
-include("julia/diseaseProg.jl")
+include("src/diseaseProg.jl")
 
 py"""
 import os
@@ -11,6 +11,7 @@ exec(open(path).read())
 """
 
 initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4)
+t = 10 # Time within simulation
 
 @testset "DiseaseProg & HospitalAdmission" begin
     @test  py"np.transpose(trFunc_diseaseProgression())"==
@@ -19,8 +20,13 @@ initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4)
 	trFunc_HospitalAdmission(;initial_state...)
 	@test py"np.transpose(trFunc_HospitalDischarge())"≈
 	trFunc_HospitalDischarge(;initial_state...)
+	@test py"np.transpose(trFunc_travelInfectionRate_ageAdjusted(10))"≈
+	trFunc_travelInfectionRate_ageAdjusted(t)
 	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
 	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
+end
+
+@testset "not working"
 	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,1,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈
 	py"np.matmul(ageSocialMixingBaseline-ageSocialMixingDistancing,np.einsum('ijk,j->ik',stateTensor[:,1:(4+1),0,2:], transmissionInfectionStage))"
 	@test py"trFunc_newInfections_Complete(stateTensor=stateTensor,policySocialDistancing=False, policyImmunityPassports=True)"≈

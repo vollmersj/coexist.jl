@@ -2,7 +2,7 @@
 using DataFrames
 using CSVFiles
 using LinearAlgebra
-import StatsFuns.logistic, StatsFuns.gammapdf
+import StatsFuns: logistic, gammapdf
 
 #Based on England data (CHESS and NHS England)
 # I want a way to keep this as the "average" disease progression,

@@ -431,7 +431,6 @@ end
 
 function trFunc_travelInfectionRate_ageAdjusted(
 	t::Int64, # Time within simulation
-
 	travelMaxTime::Int64 = 200,
 	travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
 	travelDecline_mean::Float64 = 15.,

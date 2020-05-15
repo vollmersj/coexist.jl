@@ -378,3 +378,33 @@ def trFunc_newInfections_Complete(
 
 
     return ageIsoContractionRate/np.sum(stateTensor) # Normalise the rate by total population
+
+def trFunc_travelInfectionRate_ageAdjusted(
+    t, # Time (int, in days) within simulation
+
+    travelMaxTime = 200,
+    travelBaseRate = 5e-4, # How many people normally travel back to the country per day # TODO - get data
+    travelDecline_mean = 15.,
+    travelDecline_slope = 1.,
+
+    travelInfection_peak = 1e-1,
+    travelInfection_maxloc = 10.,
+    travelInfection_shape = 2.,
+
+    **kwargs
+):
+
+    tmpTime = np.arange(travelMaxTime)
+    # nAge x T TODO get some realistic data on this
+    travelAgeRateByTime = travelBaseRate * np.outer(agePopulationRatio, 1-expit((tmpTime-travelDecline_mean)/travelDecline_slope))
+
+
+    # 1 x T TODO get some realistic data on this, maybe make it age weighted
+    travelContractionRateByTime = stats.gamma.pdf(tmpTime, a=travelInfection_shape, loc=0., scale=travelInfection_maxloc/(travelInfection_shape-1))
+    travelContractionRateByTime = travelInfection_peak*travelContractionRateByTime/np.max(travelContractionRateByTime)
+
+
+    if t >= travelAgeRateByTime.shape[-1]:
+        return np.zeros(travelAgeRateByTime.shape[0])
+    else:
+        return travelAgeRateByTime[:,int(t)] * travelContractionRateByTime[int(t)]

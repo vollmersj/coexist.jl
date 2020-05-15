@@ -438,7 +438,6 @@ function trFunc_travelInfectionRate_ageAdjusted(
 	travelInfection_peak::Float64 = 1e-1,
 	travelInfection_maxloc::Float64 = 10.0,
 	travelInfection_shape::Float64 = 2.0;
-
 	kwargs...
 )
 	tmpTime = [0:1:travelMaxTime-1;]

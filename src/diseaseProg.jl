@@ -8,7 +8,8 @@ import StatsFuns: logistic, gammapdf
 # I want a way to keep this as the "average" disease progression,
 # but modify it such that old people have less favorable outcomes (as observed)
 # But correspondingly I want people at lower risk to have more favorable outcome on average
-
+const MODULE_DIR = dirname(@__FILE__)
+const DATA_DIR = joinpath(MODULE_DIR, "..", "data")
 # For calculations see data_cleaning_py.ipynb, calculations from NHS England dataset as per 05 Apr
 relativeDeathRisk_given_COVID_by_age = [-0.99742186, -0.99728639, -0.98158438,
                                         -0.9830432 , -0.82983414, -0.84039294,
@@ -30,6 +31,51 @@ agePopulationTotal = 1000*[8044.056, 7642.473, 8558.707, 9295.024, 8604.251,
 function _agePopulationRatio(agePopulationTotal)
     agePopulationTotal *= 55.98/66.27
     return agePopulationTotal/sum(agePopulationTotal)
+end
+
+function einsum(str, a, b)
+    if str=="ijl,j->i"
+        return _einsum1(a, b)
+    end
+    if str=="ijk,j->ik"
+        return _einsum2(a, b)
+    end
+    if str=="ijkl,j->i"
+        return _einsum3(a, b)
+    end
+end
+
+function _einsum1(a, b) #'ijl,j->i'
+    x,_,z = size(a)
+    p = zeros(x,z)
+    for i=1:x
+        for j=1:z
+            p[i,j] += dot(a[i,:,j], b)
+        end
+    end
+    return sum(p, dims=1)
+end
+
+function _einsum2(a, b) #'ijk,j->ik'
+    x,_,z = size(a)
+    p = zeros(x, z)
+    for i=1:x
+        for j=1:z
+            p[i,j] = dot(a[i,:,j], b)
+        end
+    end
+    return p
+end
+
+function _einsum3(a, b) #'ijkl,j->i'
+    _,x,_,z = size(a)
+    p = zeros(x,z)
+    for i=1:z
+        for j=1:x
+           p[j,i] += sum(a[:,j,:,i]*b)
+        end
+    end
+    return sum(p, dims=1)
 end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)
@@ -118,7 +164,6 @@ function trFunc_diseaseProgression(
                                   caseFatalityRatioHospital_given_COVID_by_age./(  # multiply by cfr / (1-cfr) to get correct rate towards death
                             1 .-  caseFatalityRatioHospital_given_COVID_by_age) )
 
-
     #TODO - time to death might be incorrect overall without an extra delay state, especially for young people
     # Non-hospitalised disease progression
     for i1 in [1, 2, 4]
@@ -175,10 +220,10 @@ end
 
 # Larger data driver approaches, with age distribution, see data_cleaning_R.ipynb for details
 
-ageHospitalisationRateBaseline = DataFrame(load(joinpath(pwd(),
- "data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv")))[:, end]
-ageHospitalisationRecoveryRateBaseline = DataFrame(load(joinpath(pwd(),
- "data/clean_10641_LoS_age_provider_suppressed.csv")))[:, end]
+ageHospitalisationRateBaseline = DataFrame(load(joinpath(DATA_DIR,
+ "clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv")))[:, end]
+ageHospitalisationRecoveryRateBaseline = DataFrame(load(joinpath(DATA_DIR,
+ "clean_10641_LoS_age_provider_suppressed.csv")))[:, end]
 ageHospitalisationRecoveryRateBaseline = 1.0 ./ ageHospitalisationRecoveryRateBaseline
 
 # Calculate initial hospitalisation (occupancy), that will be used to initialise the model
@@ -188,8 +233,8 @@ initBaselineHospitalOccupancyEquilibriumAgeRatio = ageHospitalisationRateBaselin
 
 # Take into account the NHS work-force in hospitals that for our purposes count
 # as "hospitalised S" population, also unaffected by quarantine measures
-ageNhsClinicalStaffPopulationRatio = DataFrame(load(joinpath(pwd(),
-      "data/clean_nhsclinicalstaff.csv")))[:,end]
+ageNhsClinicalStaffPopulationRatio = DataFrame(load(joinpath(DATA_DIR,
+      "clean_nhsclinicalstaff.csv")))[:,end]
 
 # Extra rate of hospitalisation due to COVID-19 infection stages
 # TODO - find / estimate data on this (unfortunately true rates are hard to get due to many unknown cases)
@@ -261,13 +306,13 @@ end
 # Overall new infections include within quarantine and hospital infections
 # ------------------------------------------------------------------------
 
-ageSocialMixingBaseline = DataFrame(load(joinpath(pwd(),
-"data/socialcontactdata_UK_Mossong2008_social_contact_matrix.csv")))[:,2:end]
+ageSocialMixingBaseline = DataFrame(load(joinpath(DATA_DIR,
+"socialcontactdata_UK_Mossong2008_social_contact_matrix.csv")))[:,2:end]
 ageSocialMixingBaseline = convert(Matrix, ageSocialMixingBaseline)
 ageSocialMixingBaseline = (ageSocialMixingBaseline.+ageSocialMixingBaseline')/2.0
 
-ageSocialMixingDistancing = DataFrame(load(joinpath(pwd(),
-"data/socialcontactdata_UK_Mossong2008_social_contact_matrix_with_distancing.csv")))[:,2:end]
+ageSocialMixingDistancing = DataFrame(load(joinpath(DATA_DIR,
+"socialcontactdata_UK_Mossong2008_social_contact_matrix_with_distancing.csv")))[:,2:end]
 ageSocialMixingDistancing = convert(Matrix, ageSocialMixingDistancing)
 ageSocialMixingDistancing = (ageSocialMixingDistancing.+ageSocialMixingDistancing')/2.0
 
@@ -384,62 +429,17 @@ function trFunc_newInfections_Complete(
     return ageIsoContractionRate/sum(stateTensor) # Normalise the rate by total population
 end
 
-function einsum(str, a, b)
-    if str=="ijl,j->i"
-        return _einsum1(a, b)
-    end
-    if str=="ijk,j->ik"
-        return _einsum2(a, b)
-    end
-    if str=="ijkl,j->i"
-        return _einsum3(a, b)
-    end
-end
-
-function _einsum1(a, b) #'ijl,j->i'
-    x,_,z = size(a)
-    p = zeros(x,z)
-    for i=1:x
-        for j=1:z
-            p[i,j] += dot(a[i,:,j], b)
-        end
-    end
-    return sum(p, dims=1)
-end
-
-function _einsum2(a, b) #'ijk,j->ik'
-    x,_,z = size(a)
-    p = zeros(x, z)
-    for i=1:x
-        for j=1:z
-            p[i,j] = dot(a[i,:,j], b)
-        end
-    end
-    return p
-end
-
-function _einsum3(a, b) #'ijkl,j->i'
-    _,x,_,z = size(a)
-    p = zeros(x,z)
-    for i=1:z
-        for j=1:x
-           p[j,i] += sum(a[:,j,:,i]*b)
-        end
-    end
-    return sum(p, dims=1)
-end
-
 function trFunc_travelInfectionRate_ageAdjusted(
-	t::Int64, # Time within simulation
-	travelMaxTime::Int64 = 200,
-	travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
-	travelDecline_mean::Float64 = 15.0,
-	travelDecline_slope::Float64 = 1.0,
-	travelInfection_peak::Float64 = 1e-1,
-	travelInfection_maxloc::Float64 = 10.0,
-	travelInfection_shape::Float64 = 2.0;
-	kwargs...
-)
+	     t::Int64, # Time within simulation
+	     travelMaxTime::Int64 = 200,
+	     travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
+	     travelDecline_mean::Float64 = 15.0,
+	     travelDecline_slope::Float64 = 1.0,
+	     travelInfection_peak::Float64 = 1e-1,
+	     travelInfection_maxloc::Float64 = 10.0,
+	     travelInfection_shape::Float64 = 2.0;
+	     kwargs...
+         )
 	tmpTime = [0:1:travelMaxTime-1;]
 	# nAge x T TODO get some realistic data on this
 	travelAgeRateByTime = travelBaseRate .* (agePopulationRatio * transpose(1 .- map(logistic,

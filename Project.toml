@@ -1,0 +1,21 @@
+name = "coexist"
+uuid = "08789a54-ca73-42e4-a4a6-0e903b52103e"
+authors = ["Sebastian Vollmer", "Aadesh Deshmukh", "Dinesh Vikram", "Gergo Bohner"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+CSVFiles = "5d742f6a-9f54-50ce-8119-2520741973ca"
+DataFrame = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+
+[compat]
+julia = "1.4"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

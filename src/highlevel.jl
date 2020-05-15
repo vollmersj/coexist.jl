@@ -1,7 +1,7 @@
 using ModelingToolkit
 using DifferentialEquations
-using TensorOperations
-using Einsum
+#using TensorOperations
+#using Einsum
 
 ## lets try tensor states that just one dimensional ODE for each component
 # Attempt1
@@ -21,9 +21,8 @@ nIso = 4 # None/distancing, Case isolation, Hospitalised, Hospital staff
 nTest = 4 # untested/negative, Virus positive, Antibody positive, Both positive
 
 
-#@variables t
-#@variables stateTensor[1:nAge,1:nHS,1:nIso,1:nTest][t]
-#@variables dstateTensor[1:nAge,1:nHS,1:nIso,1:nTest][t]
+@variables t
+@variables stateTensor[1:nAge,1:nHS,1:nIso,1:nTest][t]
 
 @derivatives D'~t
 
@@ -68,14 +67,13 @@ function f!(dstateTensor,stateTensor,p,t)
   # @cast from TensorCast only works with two repeeated index
   # https://discourse.julialang.org/t/einstein-convention-for-slicing-or-how-to-view-diagonals-in-tensors/38553/3
   # maybe with CartesianIndex or @views
-#  trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
+  trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
   for iso=1:nIso
     for ag=1:nAge
       for hs=1:nHS
         for tst=1:nTest
           for nhs=1:nHS #new health state
               trTensor_complete[ag,hs,iso,tst,nhs,iso,tst]+=trTensor_diseaseProgression[ag,hs,iso,nhs]
-
           end
         end
       end
@@ -83,11 +81,24 @@ function f!(dstateTensor,stateTensor,p,t)
   end
   dstateTensor=zeros((nAge, nHS, nIso, nTest))
 
-  for i=1:nAge
+  for ag=1:nAge
+    for hs=1:nHS
+      for iso=1:nIso
+        for tst=1:nTest
+          for nhs=1:nHS
+            for niso=1:nIso
+              for ntst=1:nTest
+                dstateTensor[ag,hs,iso,tst]+=stateTensor[1,nhs,niso,ntst,]* trTensor_complete[ag,nhs,niso,ntst,hs,iso,tst]
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+     #@tensor v[ag,m,n,p]=stateTensor[1,j,k,l]* trTensor_complete[1,j,k,l,m,n,p]
 
-     v=view(dstateTensor,i,:,:,:)
-     @tensor v[m,n,p]=stateTensor[1,j,k,l]* trTensor_complete[1,j,k,l,m,n,p]
-   end
   #@einsum dstateTensor[i,m,n,p]:=stateTensor[i,j,k,l]* trTensor_complete[i,j,k,l,m,n,p]
 
   # if we want to use TensorOperations which seems maintained this is the way to go
@@ -97,16 +108,26 @@ function f!(dstateTensor,stateTensor,p,t)
   #   v=view(ddstateTensor,i,:,:,:)
   #   @tensor v[m,n,p]=stateTensor[1,j,k,l]* trTensor_complete[1,j,k,l,m,n,p]
   # end
-end
 
-prob = ODEProblem(f!,ones((nAge, nHS, nIso, nTest)),(0.0,2.0),p=nothing)
+stateTensor=100*ones((nAge, nHS, nIso, nTest))
+f!(dstateTensor,stateTensor,[],0.0)
+dstateTensor
+
+
+
+
+prob = ODEProblem(f!,100*ones((nAge, nHS, nIso, nTest)),(0.0,50.0),p=nothing)
 sys = modelingtoolkitize(prob)
 sol = solve(prob,Tsit5())
 
 
 
+sol.u
+using Plots
 
 
+
+ssize=(nAge, nHS, nIso, nTest)
 
 # Playground
 # #dydt = np.einsum('ijkl,ijklmnp->imnp', stateTensor, trTensor_complete) # contract the HS axis, keep age
@@ -115,6 +136,57 @@ sol = solve(prob,Tsit5())
 # C=ones((3,3))
 # @einsum C[1,i]=A[i,j]*b[j]
 # c=view(C,1,:)
+
 # # https://tutorials.sciml.ai/html/introduction/03-optimizing_diffeq_code.html
 # c[:]=zeros(3)
 # C
+function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
+  trTensor_diseaseProgression=trFunc_diseaseProgression()
+  dstateTensor=reshape(dstateTensor_vec,(nAge, nHS, nIso, nTest))
+  stateTensor=reshape(stateTensor_vec,(nAge, nHS, nIso, nTest))
+
+  # Efficient Python version
+  # # Get disease condition updates with no isolation or test transition ("diagonal along those")
+  #    for k1 in [0,1,2,3]:
+  #        np.einsum('ijlml->ijlm',
+  #            trTensor_complete[:,:,k1,:,:,k1,:])[:] += np.expand_dims(
+  #                trTensor_diseaseProgression[:,:,k1,:]
+  #                ,[2])  # AUTOMATICALLY broadcast all non-hospitalised disease progression is same
+  # @cast from TensorCast only works with two repeeated index
+  # https://discourse.julialang.org/t/einstein-convention-for-slicing-or-how-to-view-diagonals-in-tensors/38553/3
+  # maybe with CartesianIndex or @views
+  trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
+  for iso=1:nIso
+    for ag=1:nAge
+      for hs=1:nHS
+        for tst=1:nTest
+          for nhs=1:nHS #new health state
+              trTensor_complete[ag,hs,iso,tst,nhs,iso,tst]+=trTensor_diseaseProgression[ag,hs,iso,nhs]
+          end
+        end
+      end
+    end
+  end
+  dstateTensor=zeros((nAge, nHS, nIso, nTest))
+
+  for ag=1:nAge
+    for hs=1:nHS
+      for iso=1:nIso
+        for tst=1:nTest
+          for nhs=1:nHS
+            for niso=1:nIso
+              for ntst=1:nTest
+                dstateTensor[ag,hs,iso,tst]+=stateTensor[1,nhs,niso,ntst,]* trTensor_complete[ag,nhs,niso,ntst,hs,iso,tst]
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+n=prod([ssize...])
+prob = ODEProblem(f_vec!,100*ones(n),(0.0,50.0),p=nothing)
+sys = modelingtoolkitize(prob)
+sol = solve(prob,Tsit5())

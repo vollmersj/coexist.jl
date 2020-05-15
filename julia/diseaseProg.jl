@@ -435,7 +435,6 @@ function trFunc_travelInfectionRate_ageAdjusted(
 	travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
 	travelDecline_mean::Float64 = 15.,
 	travelDecline_slope::Float64 = 1.,
-
 	travelInfection_peak::Float64 = 1e-1,
 	travelInfection_maxloc::Float64 = 10.,
 	travelInfection_shape::Float64 = 2.;

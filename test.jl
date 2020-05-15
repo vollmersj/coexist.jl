@@ -11,6 +11,7 @@ exec(open(path).read())
 """
 
 initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4)
+t = 10 # Time within simulation
 
 @testset "DiseaseProg & HospitalAdmission" begin
     @test  py"np.transpose(trFunc_diseaseProgression())"==
@@ -19,6 +20,11 @@ initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4)
 	trFunc_HospitalAdmission(;initial_state...)
 	@test py"np.transpose(trFunc_HospitalDischarge())"≈
 	trFunc_HospitalDischarge(;initial_state...)
+	@test py"np.transpose(trFunc_travelInfectionRate_ageAdjusted(10))"≈
+	trFunc_travelInfectionRate_ageAdjusted(t)
+end
+
+@testset "not working"
 	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
 	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
 	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,1,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈

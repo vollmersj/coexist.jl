@@ -36,7 +36,7 @@ Deploying reliable virus testing at the rate of 1 million tests per day, combine
 Note that the results in Policy C assume that the 1 million 'reliable' daily tests are deployed with a practical -- not theoretical! -- sensitivity of 90% around symptom onset (when patients present the highest viral loads), decreasing to 85% for later stages. Test sensitivity is assumed to be 70% for asymptomatic carriers. Such a test is likely better than is realistically achievable.
 
 <p align="center">
-<img src="images/figure1c.png" width="80%">
+<a href="http://htmlpreview.github.io/?https://github.com/vollmersj/coexist.jl/blob/master/images/figure1c.html" target="_blank"><img src="images/figure1c.png" width="80%"></a>
 </p>
 
 For comparison, we investigated the effect of instituting the same case-isolation home quarantine policy with a dramatically less sensitive virus test, but deployed at the level of 5 million tests per day (Policy D, below).  We find that this test, despite being so insensitive as to perhaps appear 'useless,' is capable of not only flattening the curve, but effectively suppressing it.  This prevents a large portion of the population from contracting the disease at all. This supression buys time to develop vaccines and vaccination-based immunity, whilst going about normal levels of social mixing (for those not home quarantined).

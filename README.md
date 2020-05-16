@@ -36,7 +36,7 @@ Deploying reliable virus testing at the rate of 1 million tests per day, combine
 Note that the results in Policy C assume that the 1 million 'reliable' daily tests are deployed with a practical -- not theoretical! -- sensitivity of 90% around symptom onset (when patients present the highest viral loads), decreasing to 85% for later stages. Test sensitivity is assumed to be 70% for asymptomatic carriers. Such a test is likely better than is realistically achievable.
 
 <p align="center">
-<a href="http://htmlpreview.github.io/?https://github.com/vollmersj/coexist.jl/blob/master/images/figure1c.html" target="_blank"><img src="images/figure1c.png" width="80%"></a>
+<img src="images/figure1c.png" width="80%">
 </p>
 
 For comparison, we investigated the effect of instituting the same case-isolation home quarantine policy with a dramatically less sensitive virus test, but deployed at the level of 5 million tests per day (Policy D, below).  We find that this test, despite being so insensitive as to perhaps appear 'useless,' is capable of not only flattening the curve, but effectively suppressing it.  This prevents a large portion of the population from contracting the disease at all. This supression buys time to develop vaccines and vaccination-based immunity, whilst going about normal levels of social mixing (for those not home quarantined).
@@ -50,7 +50,7 @@ The results in Policy D assume that 5 million 'useless' daily tests are deployed
 One drawback of employing the 'larger number but lower reliability' testing strategy is economic cost.  We assume a false positive rate of 5% for both tests (likely higher than is realistic!); deploying more tests then causes a higher absolute number of healthy but quarantined false positives. The unnecessary transient quarantining of approximately an extra 3 million people (~2% of England's population) is arguably justified in the context of the proposed health benefits of suppressing viral transmission, as well as the economic benefits of ending the current lockdown.
 
 <p align="center">
-<a href="http://htmlpreview.github.io/?https://github.com/vollmersj/coexist.jl/blob/master/images/figure1e.html" target="_blank"><img src="images/figure1e.png" width="80%"></a>
+<a href="http://htmlpreview.github.io/?https://github.com/vollmersj/coexist.jl/blob/master/images/figure1e.html"target="_blank"><img src="images/figure1e.png" width="80%"></a>
 </p>
 
 

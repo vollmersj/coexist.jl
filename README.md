@@ -50,7 +50,7 @@ The results in Policy D assume that 5 million 'useless' daily tests are deployed
 One drawback of employing the 'larger number but lower reliability' testing strategy is economic cost.  We assume a false positive rate of 5% for both tests (likely higher than is realistic!); deploying more tests then causes a higher absolute number of healthy but quarantined false positives. The unnecessary transient quarantining of approximately an extra 3 million people (~2% of England's population) is arguably justified in the context of the proposed health benefits of suppressing viral transmission, as well as the economic benefits of ending the current lockdown.
 
 <p align="center">
-<a href="http://htmlpreview.github.io/?https://github.com/vollmersj/coexist.jl/blob/master/images/figure1e.html" target="_blank"><img src="images/figure1e.png" width="80%"></a>
+<a href="http://htmlpreview.github.io/?https://github.com/vollmersj/coexist.jl/blob/master/images/figure1e.html"target="_blank"><img src="images/figure1e.png" width="80%"></a>
 </p>
 
 

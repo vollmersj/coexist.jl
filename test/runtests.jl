@@ -3,7 +3,8 @@ using Test
 
 include("../src/diseaseProg.jl")
 # Install scikit-learn if not installed
-PyCall.pyimport_conda("numpy", "pandas")
+PyCall.pyimport_conda("numpy", "pandas", "scipy", "dask",
+                            "cloudpickle", "distributed")
 
 py"""
 import os

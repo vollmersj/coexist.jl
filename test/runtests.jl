@@ -1,7 +1,9 @@
 using coexist, PyCall#env using Conda
 using Test
 
-include("src/diseaseProg.jl")
+include("../src/diseaseProg.jl")
+# Install scikit-learn if not installed
+PyCall.pyimport_conda("numpy", "pandas")
 
 py"""
 import os
@@ -24,9 +26,6 @@ t = 10 # Time within simulation
 	trFunc_travelInfectionRate_ageAdjusted(t)
 	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
 	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
-end
-
-@testset "not working"
 	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,1,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈
 	py"np.matmul(ageSocialMixingBaseline-ageSocialMixingDistancing,np.einsum('ijk,j->ik',stateTensor[:,1:(4+1),0,2:], transmissionInfectionStage))"
 	@test py"trFunc_newInfections_Complete(stateTensor=stateTensor,policySocialDistancing=False, policyImmunityPassports=True)"≈

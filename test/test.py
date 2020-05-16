@@ -195,8 +195,8 @@ def trFunc_diseaseProgression(
     return trTensor_diseaseProgression
 
 # Larger data driver approaches, with age distribution, see data_cleaning_R.ipynb for details
-ageHospitalisationRateBaseline = pd.read_csv('data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv', sep=',').iloc[:,-1].values
-ageHospitalisationRecoveryRateBaseline = 1./pd.read_csv('data/clean_10641_LoS_age_provider_suppressed.csv', sep=',').iloc[:,-1].values
+ageHospitalisationRateBaseline = pd.read_csv('../data/clean_hosp-epis-stat-admi-summ-rep-2015-16-rep_table_6.csv', sep=',').iloc[:,-1].values
+ageHospitalisationRecoveryRateBaseline = 1./pd.read_csv('../data/clean_10641_LoS_age_provider_suppressed.csv', sep=',').iloc[:,-1].values
 
 # Calculate initial hospitalisation (occupancy), that will be used to initialise the model
 initBaselineHospitalOccupancyEquilibriumAgeRatio = ageHospitalisationRateBaseline/(ageHospitalisationRateBaseline+ageHospitalisationRecoveryRateBaseline)
@@ -204,7 +204,7 @@ initBaselineHospitalOccupancyEquilibriumAgeRatio = ageHospitalisationRateBaselin
 
 # Take into account the NHS work-force in hospitals that for our purposes count as "hospitalised S" population,
 # also unaffected by quarantine measures
-ageNhsClinicalStaffPopulationRatio = pd.read_csv('data/clean_nhsclinicalstaff.csv', sep=',').iloc[:,-1].values
+ageNhsClinicalStaffPopulationRatio = pd.read_csv('../data/clean_nhsclinicalstaff.csv', sep=',').iloc[:,-1].values
 
 # Extra rate of hospitalisation due to COVID-19 infection stages
 # TODO - find / estimate data on this (unfortunately true rates are hard to get due to many unknown cases)
@@ -277,12 +277,12 @@ def trFunc_HospitalDischarge(
 
     return trTensor_HospitalDischarge
 
-ageSocialMixingBaseline = pd.read_csv('data/socialcontactdata_UK_Mossong2008_social_contact_matrix.csv', sep=',').iloc[:,1:].values
+ageSocialMixingBaseline = pd.read_csv('../data/socialcontactdata_UK_Mossong2008_social_contact_matrix.csv', sep=',').iloc[:,1:].values
 
 
 ageSocialMixingBaseline = (ageSocialMixingBaseline+ageSocialMixingBaseline.T)/2.
 
-ageSocialMixingDistancing = pd.read_csv('data/socialcontactdata_UK_Mossong2008_social_contact_matrix_with_distancing.csv', sep=',').iloc[:,1:].values
+ageSocialMixingDistancing = pd.read_csv('../data/socialcontactdata_UK_Mossong2008_social_contact_matrix_with_distancing.csv', sep=',').iloc[:,1:].values
 
 ageSocialMixingDistancing = (ageSocialMixingDistancing+ageSocialMixingDistancing.T)/2.
 

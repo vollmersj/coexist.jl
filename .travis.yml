@@ -15,3 +15,6 @@ jobs:
   allow_failures:
     - julia: nightly
   fast_finish: true
+env:
+    global:
+    - PYTHON=conda

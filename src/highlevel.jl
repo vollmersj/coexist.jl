@@ -3,52 +3,15 @@ using DifferentialEquations
 #using TensorOperations
 #using Einsum
 
-## lets try tensor states that just one dimensional ODE for each component
-# Attempt1
-# Health states (S, E and D are fixed to 1 dimension)
-nI_symp = 2 # number of sympyomatic infected states
-nI = 2+nI_symp # number of total infected states (disease stages), the +2 are Exposed and I_nonsymptomatic
-nR = 2 # number of recovery states (antibody development post-disease, IgM and IgG are two stages)
-nHS = 2+nI+nR # number of total health states, the +2: S, D are suspectible and dead
-
-# Age groups (risk groups)
-nAge = 9 # In accordance w Imperial #13 report (0-9, 10-19, ... 70-79, 80+)
-
-# Isolation states
-nIso = 4 # None/distancing, Case isolation, Hospitalised, Hospital staff
-
-# Testing states
-nTest = 4 # untested/negative, Virus positive, Antibody positive, Both positive
 
 
-@variables t
-@variables stateTensor[1:nAge,1:nHS,1:nIso,1:nTest][t]
 
-@derivatives D'~t
-
-eqs = [D(stateTensor) ~stateTensor]
-
-u0 = [stateTensor => ones((nAge, nHS, nIso, nTest))]
-sys = ODESystem(eqs)
-tspan = (0.0,100.0)
-prob = ODEProblem(sys,u0,tspan,p;jac=true,sparse=true)
-
-
-## Attemp 2 via
-
-function f!(dstateTensor,stateTensor,p,t)
-      dstateTensor[:]=stateTensor
-end
-
-prob = ODEProblem(f!,ones((nAge, nHS, nIso, nTest)),(0.0,2.0),p=nothing)
-sys = modelingtoolkitize(prob)
-sol = solve(prob,Tsit5())
 
 # yeah
 include("utils.jl")
 include("diseaseProg_basic.jl")
 
-
+# todo replace with inital state tensor
 stateTensor= 100*ones((nAge, nHS, nIso, nTest))
 dstateTensor=100*ones((nAge, nHS, nIso, nTest))
 trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
@@ -122,8 +85,6 @@ sol = solve(prob,Tsit5())
 
 
 
-sol.u
-using Plots
 
 
 
@@ -184,9 +145,31 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
       end
     end
   end
+
 end
 
 n=prod([ssize...])
-prob = ODEProblem(f_vec!,100*ones(n),(0.0,50.0),p=nothing)
+prob = ODEProblem(f_vec!,100*ones(n),(0.0,80.0),p=nothing)
 sys = modelingtoolkitize(prob)
 sol = solve(prob,Tsit5())
+
+
+
+
+
+#using Pkg
+#Pkg.add(PackageSpec(url="https://github.com/JuliaDiffEq/SciPyDiffEq.jl", rev="master"))
+using SciPyDiffEq
+SciPyDiffEq.RK23
+
+
+#
+# fun = lambda t,y: dydt_Complete(t,y, **kwargs),
+# t_span=(0.,total_days),
+# y0 = cur_stateTensor,
+# method='RK23',
+# t_eval=range(total_days),
+# rtol = 1e-3, #default 1e-3
+# atol = 1e-3, # default 1e-6
+# SciPyDiffEq code is compiling forever
+sol = solve(prob,SciPyDiffEq.RK23(),rtol=1.0e-3,atol=1.0e-3,saveat=1.0*[0:80;])

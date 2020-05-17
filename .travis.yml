@@ -19,6 +19,6 @@ jobs:
 env:
     global:
     - PYTHON=conda
-before_install:
+after_install:
   - conda config --show channels
   - conda config --show sources

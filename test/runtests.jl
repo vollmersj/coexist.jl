@@ -9,6 +9,8 @@ PyCall.pyimport_conda("scipy", "scipy")
 PyCall.pyimport_conda("dask", "dask")
 PyCall.pyimport_conda("cloudpickle", "cloudpickle")
 PyCall.pyimport_conda("distributed", "distributed")
+PyCall.pyimport_conda("xlrd", "xlrd")
+
 
 py"""
 import os

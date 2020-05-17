@@ -18,4 +18,4 @@ jobs:
   fast_finish: true
 env:
     global:
-    - PYTHON=conda
+    - PYTHON=Conda

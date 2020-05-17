@@ -32,8 +32,8 @@ t = 10 # Time within simulation
 	trFunc_travelInfectionRate_ageAdjusted(t)
 	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
 	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
-	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,1,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈
-	py"np.matmul(ageSocialMixingBaseline-ageSocialMixingDistancing,np.einsum('ijk,j->ik',stateTensor[:,1:(4+1),0,2:], transmissionInfectionStage))"
+	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,4,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈
+	py"np.matmul(ageSocialMixingBaseline-ageSocialMixingDistancing,np.einsum('ijk,j->ik',stateTensor[:,1:(4+1),3,2:], transmissionInfectionStage))"
 	@test py"trFunc_newInfections_Complete(stateTensor=stateTensor,policySocialDistancing=False, policyImmunityPassports=True)"≈
 	permutedims(trFunc_newInfections_Complete(stateTensor,false,true;initial_state...),[3,2,1])
 end

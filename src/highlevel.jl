@@ -6,9 +6,12 @@ using DifferentialEquations
 
 
 
-
+x=1
 # yeah
 include("utils.jl")
+param=(nAge=nAge, nHS=nHS, nIso=nIso, nTest=nTest)
+
+include("diseaseProg.jl")
 include("diseaseProg_basic.jl")
 
 # todo replace with inital state tensor
@@ -16,9 +19,8 @@ stateTensor= 100*ones((nAge, nHS, nIso, nTest))
 dstateTensor=100*ones((nAge, nHS, nIso, nTest))
 trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
 
-f!(dstateTensor,stateTensor,nothing,0.0)
 function f!(dstateTensor,stateTensor,p,t)
-  trTensor_diseaseProgression=trFunc_diseaseProgression()
+  trTensor_diseaseProgression=trFunc_diseaseProgression(;param...)
 
   # Efficient Python version
   # # Get disease condition updates with no isolation or test transition ("diagonal along those")
@@ -85,8 +87,7 @@ sol = solve(prob,Tsit5())
 
 
 
-
-
+trFunc_diseaseProgression(;param...)
 
 ssize=(nAge, nHS, nIso, nTest)
 
@@ -102,7 +103,7 @@ ssize=(nAge, nHS, nIso, nTest)
 # c[:]=zeros(3)
 # C
 function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
-  trTensor_diseaseProgression=trFunc_diseaseProgression()
+  trTensor_diseaseProgression=trFunc_diseaseProgression(param...)
   dstateTensor=reshape(dstateTensor_vec,(nAge, nHS, nIso, nTest))
   stateTensor=reshape(stateTensor_vec,(nAge, nHS, nIso, nTest))
 
@@ -145,16 +146,25 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
       end
     end
   end
-
+  dstate[:]=reshape(dstateTensor,(nIso*nAge*nHS*nTest))
 end
 
 n=prod([ssize...])
 prob = ODEProblem(f_vec!,100*ones(n),(0.0,80.0),p=nothing)
 sys = modelingtoolkitize(prob)
+dstate=100*ones(n)
+state=100*ones(n)
+f_vec!(dstate,state,[],0.0)
+dstate
 sol = solve(prob,Tsit5())
 
+Test, nIso, nHS, nAge))
+sol.k[]
+sum(stateTensor[:,:,8,:],[1,2,3])
 
 
+
+function testfun(;x=5,...)
 
 
 #using Pkg
@@ -173,3 +183,6 @@ SciPyDiffEq.RK23
 # atol = 1e-3, # default 1e-6
 # SciPyDiffEq code is compiling forever
 sol = solve(prob,SciPyDiffEq.RK23(),rtol=1.0e-3,atol=1.0e-3,saveat=1.0*[0:80;])
+
+
+sum()

@@ -1979,7 +1979,7 @@ def dydt_Complete(t,
 
 
 # Initialise state
-stateTensor_init = copy.deepcopy(stateTensor)
+stateTensor_init = 50.0*np.ones([])
 
 # Populate
 stateTensor_init[:,0,0,0] = agePopulationTotal
@@ -2050,7 +2050,7 @@ def solveSystem(stateTensor_init, total_days = 200, samplesPerDay=np.inf, **kwar
     return out
 
 
-# In[29]:
+# In[34]:
 
 
 # Uncomment below for an example short run of the full model with base parameters and quarantining policy turned on.
@@ -2063,19 +2063,25 @@ paramDict_default["INIT_stateTensor_init"] = stateTensor_init
 # Example way to set parameters conveniently, here we start quarantining early based on test results
 paramDict_current = copy.deepcopy(paramDict_default)
 paramDict_current["tStartQuarantineCaseIsolation"] = pd.to_datetime("2020-03-23", format="%Y-%m-%d")
-
+stateTensor_init=50.0* np.ones([nAge, nHS, nIso, nTest])
 out1 = solveSystem(
     stateTensor_init,
     total_days = 80,#samplesPerDay=20,
     **paramDict_current
 )
+paramDict_current["debugReturnNewPerDay"]=False
 
 
-
-# In[30]:
+# In[35]:
 
 
 exposed=np.sum(out1[1,:,1,:,:,:],axis=(0,1,2))
 #stateTensor = np.zeros((nAge, nHS, nIso, nTest))
 import pandas as pd
 df=pd.DataFrame(np.reshape(exposed,[80,1]),columns=["e"])
+
+
+# In[36]:
+
+
+df.to_csv("coexposed80.csv")

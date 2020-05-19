@@ -4,14 +4,15 @@ authors = ["Sebastian Vollmer", "Aadesh Deshmukh", "Dinesh Vikram", "Gergo Bohne
 version = "0.1.0"
 
 [deps]
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 CSVFiles = "5d742f6a-9f54-50ce-8119-2520741973ca"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
-ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
-DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
-PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+SciPyDiffEq = "505e40e9-d84e-434c-8501-7161967c02cb"
+StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 
 [compat]
 julia = "1.4"

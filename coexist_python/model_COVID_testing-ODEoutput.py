@@ -1745,7 +1745,7 @@ def trFunc_quarantine_caseIsolation(
 
 # ## Full simulation function
 
-# In[26]:
+# In[37]:
 
 
 # Function that computes the right side of the non-lin model ODE
@@ -1846,7 +1846,7 @@ def dydt_Complete(t,
 #             ))
 
     # Also add new infected from travelling of healthy people, based on time-within-simulation (this is correct with all (0,0) states, as tested or isolated people dont travel)
-    trTensor_complete[:,0,0,0,1,0,0] += trFunc_travelInfectionRate_ageAdjusted(t, **kwargs["trFunc_travelInfectionRate_ageAdjusted_params"])
+#     trTensor_complete[:,0,0,0,1,0,0] += trFunc_travelInfectionRate_ageAdjusted(t, **kwargs["trFunc_travelInfectionRate_ageAdjusted_params"])
 
 
     # Hospitalisation state updates
@@ -1975,7 +1975,7 @@ def dydt_Complete(t,
 
 # ## Initialise and run the model
 
-# In[27]:
+# In[38]:
 
 
 # Initialise state
@@ -2002,7 +2002,7 @@ stateTensor_init[:,0,0,0] -= initBaselineHospitalOccupancyEquilibriumAgeRatio * 
 # BETTER! - People get infected by travel in early stages!
 
 
-# In[28]:
+# In[39]:
 
 
 def solveSystem(stateTensor_init, total_days = 200, samplesPerDay=np.inf, **kwargs):
@@ -2050,7 +2050,7 @@ def solveSystem(stateTensor_init, total_days = 200, samplesPerDay=np.inf, **kwar
     return out
 
 
-# In[34]:
+# In[40]:
 
 
 # Uncomment below for an example short run of the full model with base parameters and quarantining policy turned on.
@@ -2072,7 +2072,7 @@ out1 = solveSystem(
 paramDict_current["debugReturnNewPerDay"]=False
 
 
-# In[35]:
+# In[41]:
 
 
 exposed=np.sum(out1[1,:,1,:,:,:],axis=(0,1,2))
@@ -2081,7 +2081,10 @@ import pandas as pd
 df=pd.DataFrame(np.reshape(exposed,[80,1]),columns=["e"])
 
 
-# In[36]:
+# In[42]:
 
 
 df.to_csv("coexposed80.csv")
+
+
+# In[32]:

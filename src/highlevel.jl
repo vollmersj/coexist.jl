@@ -7,11 +7,17 @@ using DifferentialEquations
 
 
 x=1
+nAge=9
+nHS=8
+nIso=4
+nI=4
+nTest=4
+
 # yeah
 include("utils.jl")
 param=(nAge=nAge, nHS=nHS, nIso=nIso, nTest=nTest)
 
-#include("diseaseProg.jl")
+# include("diseaseProg.jl")
 include("diseaseProg_basic.jl")
 
 # todo replace with inital state tensor
@@ -27,7 +33,6 @@ trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
   #   v=view(ddstateTensor,i,:,:,:)
   #   @tensor v[m,n,p]=stateTensor[1,j,k,l]* trTensor_complete[1,j,k,l,m,n,p]
   # end
-
 ssize=(nAge, nHS, nIso, nTest)
 
 # Playground
@@ -41,6 +46,24 @@ ssize=(nAge, nHS, nIso, nTest)
 # # https://tutorials.sciml.ai/html/introduction/03-optimizing_diffeq_code.html
 # c[:]=zeros(3)
 # C
+
+using PyCall
+using Test
+
+PyCall.pyimport_conda("pandas", "pandas")
+PyCall.pyimport_conda("numpy", "numpy")
+PyCall.pyimport_conda("scipy", "scipy")
+PyCall.pyimport_conda("dask", "dask")
+PyCall.pyimport_conda("cloudpickle", "cloudpickle")
+PyCall.pyimport_conda("distributed", "distributed")
+PyCall.pyimport_conda("xlrd", "xlrd")
+
+py"""
+import os
+# print(os.getcwd())
+exec(open(os.path.join(os.getcwd(), "coexist_python", "model_COVID_testing-ODEoutput.py")).read())
+"""
+
 function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
   trTensor_diseaseProgression=trFunc_diseaseProgression(param...)
   dstateTensor=reshape(dstateTensor_vec,(nAge, nHS, nIso, nTest))
@@ -68,7 +91,10 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
       end
     end
   end
-  dstateTensor=zeros((nAge, nHS, nIso, nTest))
+  @testset "Checking" begin
+    @test py"test1" == trTensor_diseaseProgression
+    @test py"test" == trTensor_diseaseProgression
+  end
 
   for ag=1:nAge
     for hs=1:nHS
@@ -89,17 +115,22 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
 end
 
 n=prod([ssize...])
+println(n)
 dstate= 50*ones(n)
 state= ones(n)
-f_vec!(dstate,state,nothing,0.0)
-prob = ODEProblem(f_vec!,100*ones(n),(0.0,80.0),p=nothing)
-# sys = modelingtoolkitize(prob)
-dstate=100*ones(n)
-state=100*ones(n)
-f_vec!(dstate,state,[],0.0)
+println(size(state))
+out = f_vec!(dstate,state,nothing,0.0)
+# println(out)
+# println(size(out))
 
-sol = solve(prob,Tsit5())
+# prob = ODEProblem(f_vec!,100*ones(n),(0.0,80.0),p=nothing)
+# # sys = modelingtoolkitize(prob)
+# dstate=100*ones(n)
+# state=100*ones(n)
+# f_vec!(dstate,state,[],0.0)
 
+# sol = solve(prob,Tsit5())
+# println(sol)
 
 # sum to get all infacted sum(stateTensor[:,:,8,:],[1,2,3])
 

@@ -2076,7 +2076,7 @@ test1 = t
 # In[41]:
 
 
-exposed=np.sum(out1[1,:,1,:,:,:],axis=(0,1,2))
+# exposed=np.sum(out1[1,:,1,:,:,:],axis=(0,1,2))
 #stateTensor = np.zeros((nAge, nHS, nIso, nTest))
 # import pandas as pd
 # df=pd.DataFrame(np.reshape(exposed,[80,1]),columns=["e"])

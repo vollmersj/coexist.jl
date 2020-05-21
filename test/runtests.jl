@@ -18,7 +18,7 @@ path = os.path.join(relative_path, 'test.py')
 exec(open(path).read())
 """
 
-initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4)
+initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4, nR=2)
 t = 10 # Time within simulation
 
 @testset "DiseaseProg & HospitalAdmission" begin

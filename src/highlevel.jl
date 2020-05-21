@@ -91,10 +91,10 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
       end
     end
   end
-#   @testset "Checking intermediate state" begin
-#     @test py"test1" == trTensor_diseaseProgression
-#     @test py"test" == trTensor_diseaseProgression
-#   end
+  @testset "Checking intermediate state" begin
+    @test py"test1" == trTensor_diseaseProgression
+    @test py"test" == trTensor_diseaseProgression
+  end
 
   for ag=1:nAge
     for hs=1:nHS

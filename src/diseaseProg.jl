@@ -42,7 +42,13 @@ function einsum(str, a, b)
     end
     if str=="ijkl,j->i"
         return _einsum3(a, b)
-    end
+    end 
+end
+
+function einsum(str, a)
+   if "ijlml->ijlm" 
+      return _einsum4(a)  
+   end
 end
 
 function _einsum1(a, b) #'ijl,j->i'
@@ -76,6 +82,19 @@ function _einsum3(a, b) #'ijkl,j->i'
         end
     end
     return sum(p, dims=1)
+end
+
+function _einsum4(a) #'ijlml->ijlm'
+    v,w,x,y,z = size(a)
+    p = zeros(y,v,y,z)
+    for k in 1:z
+        for j in 1:y
+            for i in 1:v
+                p[:,i,j,k] = a[i,:,i,j,k]
+            end
+        end
+    end
+    return p
 end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)

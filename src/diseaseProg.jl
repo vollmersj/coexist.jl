@@ -2,6 +2,7 @@
 using DataFrames
 using CSVFiles
 using LinearAlgebra
+using Dates
 import StatsFuns: logistic, gammapdf
 
 #Based on England data (CHESS and NHS England)
@@ -561,6 +562,3 @@ function inpFunc_testSpecifications(
 
     return testSpecifications
 end
-
-initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4, nR=2)
-# println(convert(Matrix, inpFunc_testSpecifications(;initial_state...)))

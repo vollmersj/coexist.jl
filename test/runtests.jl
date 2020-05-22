@@ -21,6 +21,31 @@ exec(open(path).read())
 initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4, nR=2)
 t = 10 # Time within simulation
 
+## Setup for testing
+
+# `inpFunc_testSpecifications`
+_other, _name, __truePosHealthState = py"inpFunc_testSpecifications()"
+other = inpFunc_testSpecifications(;initial_state...)
+name = convert(Array, select(other, :Name))
+name = reshape(name, size(name)[1])
+_truePosHealthState = [[] for i in 1:size(__truePosHealthState)[1]]
+for i in 1:24
+	_len = size(__truePosHealthState[i])[1]
+	_temp = [0 for i in 1:_len]
+	for j in 1:size(__truePosHealthState[i])[1]
+		_temp[j] = __truePosHealthState[i][j]
+	end
+	_truePosHealthState[i] = _temp
+end
+truePosHealthState = convert(Array, select(other, :TruePosHealthState))
+truePosHealthState = reshape(truePosHealthState, size(truePosHealthState)[1])
+
+other = select(other, Not(:Name))
+other = select(other, Not(:TruePosHealthState))
+other = convert(Array, other)
+
+# End of setup
+
 @testset "DiseaseProg & HospitalAdmission" begin
     @test  py"np.transpose(trFunc_diseaseProgression())"==
 	trFunc_diseaseProgression(;initial_state...)
@@ -30,6 +55,12 @@ t = 10 # Time within simulation
 	trFunc_HospitalDischarge(;initial_state...)
 	@test py"np.transpose(trFunc_travelInfectionRate_ageAdjusted(10))"≈
 	trFunc_travelInfectionRate_ageAdjusted(t)
+
+	# inpFunc_testSpecifications
+	@test _other == other
+	@test _name == name
+	@test _truePosHealthState == truePosHealthState
+
 	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
 	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
 	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,4,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈

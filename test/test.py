@@ -477,4 +477,10 @@ def inpFunc_testSpecifications(
     testSpecifications.loc[13:14,'FalsePositiveRate'] = antigen_FPR
     testSpecifications.loc[16:20,'FalsePositiveRate'] = antibody_FPR_S_to_I4
     
-    return testSpecifications
+    name = testSpecifications['Name']
+    truePosHealthState = testSpecifications['TruePosHealthState']   
+    testSpecifications.drop(['Name', 'TruePosHealthState'], inplace=True, axis=1)
+    testSpecifications = testSpecifications.to_numpy()
+    name = name.to_numpy()
+    truePosHealthState = truePosHealthState.to_numpy()
+    return testSpecifications, name, truePosHealthState

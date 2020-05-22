@@ -1039,35 +1039,35 @@ def trFunc_testCapacity(
 # Real life data on test capacity and who got tested
 # ---------------------------------------------------
 
-df_CHESS = pd.read_csv("/mnt/efs/data/CHESS_Aggregate20200417.csv").drop(0)
-df_CHESS.index = pd.to_datetime(df_CHESS["DateOfAdmission"].values,format="%d-%m-%Y")
+# df_CHESS = pd.read_csv("/mnt/efs/data/CHESS_Aggregate20200417.csv").drop(0)
+# df_CHESS.index = pd.to_datetime(df_CHESS["DateOfAdmission"].values,format="%d-%m-%Y")
 
-# Ignore too old and too recent data points
-df_CHESS = df_CHESS.sort_index().drop("DateOfAdmission", axis=1).query('20200309 <= index <= '+CONST_DATA_CUTOFF_DATE)
+# # Ignore too old and too recent data points
+# df_CHESS = df_CHESS.sort_index().drop("DateOfAdmission", axis=1).query('20200309 <= index <= '+CONST_DATA_CUTOFF_DATE)
 
-# Get number of tests per age group
-df_CHESS_numTests = df_CHESS.loc[:,df_CHESS.columns.str.startswith("AllAdmittedPatientsTestedForCOVID19")]
+# # Get number of tests per age group
+# df_CHESS_numTests = df_CHESS.loc[:,df_CHESS.columns.str.startswith("AllAdmittedPatientsTestedForCOVID19")]
 
-# Change age groups to reflect our groupings
-df_CHESS_numTests_regroup = pd.DataFrame(data = regroup_by_age(
-    inp = df_CHESS_numTests.to_numpy().T,
-    fromAgeSplits=np.concatenate([np.array([1,5,15,25]),np.arange(45,85+1,10)]),
-    toAgeSplits=np.arange(10,80+1,10)
-).T)
+# # Change age groups to reflect our groupings
+# df_CHESS_numTests_regroup = pd.DataFrame(data = regroup_by_age(
+#     inp = df_CHESS_numTests.to_numpy().T,
+#     fromAgeSplits=np.concatenate([np.array([1,5,15,25]),np.arange(45,85+1,10)]),
+#     toAgeSplits=np.arange(10,80+1,10)
+# ).T)
 
-df_CHESS_numTests_regroup.index = df_CHESS_numTests.index
+# df_CHESS_numTests_regroup.index = df_CHESS_numTests.index
 
-def inpFunc_testingDataCHESS_PCR(
-    realTime,
-    realTestData = df_CHESS_numTests_regroup,
-    **kwargs
-    ):
+# def inpFunc_testingDataCHESS_PCR(
+#     realTime,
+#     realTestData = df_CHESS_numTests_regroup,
+#     **kwargs
+#     ):
 
-    def nearest(items, pivot):
-        return min(items, key=lambda x: abs(x - pivot))
+#     def nearest(items, pivot):
+#         return min(items, key=lambda x: abs(x - pivot))
 
 
-    return df_CHESS_numTests_regroup.loc[nearest(df_CHESS_numTests_regroup.index, pd.to_datetime(realTime, format="%Y-%m-%d"))]
+#     return df_CHESS_numTests_regroup.loc[nearest(df_CHESS_numTests_regroup.index, pd.to_datetime(realTime, format="%Y-%m-%d"))]
 
 
 
@@ -1502,7 +1502,7 @@ def trFunc_testing(
     policyFunc = policyFunc_testing_massTesting_with_reTesting,
     inpFunc_testSpecifications = inpFunc_testSpecifications,
     trFunc_testCapacity = trFunc_testCapacity,
-    inpFunc_realData_testCapacity = inpFunc_testingDataCHESS_PCR,
+    # inpFunc_realData_testCapacity = inpFunc_testingDataCHESS_PCR,
     **kwargs
     ):
     """
@@ -1812,19 +1812,16 @@ def dydt_Complete(t,
     # Initialise the full transition tensor
     trTensor_complete = np.zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
 
-
     # Disease condition updates
     # ---------------------------
     trTensor_diseaseProgression = trFunc_diseaseProgression(**kwargs["trFunc_diseaseProgression_params"])
-
     # Get disease condition updates with no isolation or test transition ("diagonal along those")
     for k1 in [0,1,2,3]:
         np.einsum('ijlml->ijlm',
             trTensor_complete[:,:,k1,:,:,k1,:])[:] += np.expand_dims(
                 trTensor_diseaseProgression[:,:,k1,:]
                 ,[2]) # all non-hospitalised disease progression is same
-
-
+    temp = trTensor_diseaseProgression
 #     # Compute new infections (0->1 in HS) with no isolation or test transition ("diagonal along those")
 #     cur_policySocialDistancing = (
 #                     t >= (tStartSocialDistancing - realStartDate).days
@@ -1931,7 +1928,7 @@ def dydt_Complete(t,
 
     # Compute the actual derivatives
     dydt = np.einsum('ijkl,ijklmnp->imnp', stateTensor, trTensor_complete) # contract the HS axis, keep age
-
+    # print(dydt)
 
     if debugReturnNewPerDay:
         """
@@ -1967,9 +1964,9 @@ def dydt_Complete(t,
 
 
     if debugTransition:
-        return np.reshape(dydt, -1), trTensor_complete
+        return np.reshape(dydt, -1), temp
 
-    return np.reshape(dydt, -1)
+    return np.reshape(dydt, -1), temp
 
 
 
@@ -1979,7 +1976,7 @@ def dydt_Complete(t,
 
 
 # Initialise state
-stateTensor_init = 50.0*np.ones([])
+stateTensor_init = 50.0*np.ones([nAge,  nHS, nIso, nTest])
 
 # Populate
 stateTensor_init[:,0,0,0] = agePopulationTotal
@@ -2064,27 +2061,36 @@ paramDict_default["INIT_stateTensor_init"] = stateTensor_init
 paramDict_current = copy.deepcopy(paramDict_default)
 paramDict_current["tStartQuarantineCaseIsolation"] = pd.to_datetime("2020-03-23", format="%Y-%m-%d")
 stateTensor_init=50.0* np.ones([nAge, nHS, nIso, nTest])
-out1 = solveSystem(
-    stateTensor_init,
-    total_days = 80,#samplesPerDay=20,
-    **paramDict_current
-)
+# out1 = solveSystem(
+#     stateTensor_init,
+#     total_days = 80,#samplesPerDay=20,
+#     **paramDict_current
+# )
 paramDict_current["debugReturnNewPerDay"]=False
 
+state = 50*np.ones(9*8*4*4)
+out, t = dydt_Complete(0, state, **paramDict_current)
+test = np.transpose(t)
+test1 = t
 
 # In[41]:
 
 
-exposed=np.sum(out1[1,:,1,:,:,:],axis=(0,1,2))
+# exposed=np.sum(out1[1,:,1,:,:,:],axis=(0,1,2))
 #stateTensor = np.zeros((nAge, nHS, nIso, nTest))
-import pandas as pd
-df=pd.DataFrame(np.reshape(exposed,[80,1]),columns=["e"])
+# import pandas as pd
+# df=pd.DataFrame(np.reshape(exposed,[80,1]),columns=["e"])
 
 
-# In[42]:
+# # In[42]:
 
 
-df.to_csv("coexposed80.csv")
+# df.to_csv("coexposed80.csv")
 
 
 # In[32]:
+
+# %%
+
+
+# %%

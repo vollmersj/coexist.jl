@@ -408,3 +408,79 @@ def trFunc_travelInfectionRate_ageAdjusted(
         return np.zeros(travelAgeRateByTime.shape[0])
     else:
         return travelAgeRateByTime[:,int(t)] * travelContractionRateByTime[int(t)]
+
+def inpFunc_testSpecifications(
+    PCR_FNR_I1_to_R2 = np.array([ 0.9,  0.4, 0.15, 0.35, 0.5, 0.8]),
+    PCR_FPR = 0.01,
+    antigen_FNR_I1_to_R2 = np.array([ 0.95, 0.6, 0.35, 0.45, 0.6, 0.9]),
+    antigen_FPR = 0.1,
+    antibody_FNR_I1_to_R2 = np.array([0.99, 0.85, 0.8, 0.65, 0.3, 0.05]),
+    antibody_FPR_S_to_I4 =  np.array([0.05, 0.04, 0.03, 0.02, 0.01])
+    ):
+    
+    
+    testSpecifications = pd.DataFrame(
+    columns=["Name"],#, "Infection stage"],#, "Sensitivity", "Specificity"],
+    
+    data = (
+        ["PCR"] * nHS +
+        ["Antigen"] * (nHS) +
+        ["Antibody"] * (nHS))
+    )
+
+    testSpecifications['OutputTestState'] = [1]*nHS + [1]*nHS + [2]*nHS # what information state does a pos test transition you to.
+
+    testSpecifications['TruePosHealthState'] = [np.arange(1,nI+1)]*nHS + [np.arange(1,nI+1)]*nHS + [np.arange(nI+1,nI+nR+1)]*nHS # what information state does a pos test transition you to.
+
+    # In some health states some people are true negatives and some are true positives! (No, makes litte sense to use, just account for it in FPR? Only matters for test makers...)
+    # testSpecifications['AmbiguousPosHealthState'] = [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(1, nI+1)]*nHS # what information state does a pos test transition you to.
+
+    testSpecifications['InputHealthState'] = list(np.tile(range(nHS),3))
+
+    # These numbers below are "defaults" illustrating the concept, but are modified by the inputs!!!
+    
+    testSpecifications['FalseNegativeRate'] = [ # ratio of positive (infected / immune) people missed by the test
+        # For each health stage:
+        #  S -> I1 (asymp) -> I2 (mild symp) -> I3 (symp, sick) -> I4 (symp, less sick) -> R1 / R2 (IgM, IgG avail) -> D
+
+        # PCR
+            0.,   0.9,            0.4,           0.15,                0.35,              0.5, 0.8,   0.,
+
+        # Antigen
+            0.,   0.95,           0.6,           0.35,                0.45,              0.6, 0.9,   0.,
+
+        # Antibody
+            0.,   0.99,           0.85,          0.8,                 0.65,              0.3, 0.05,  0.
+    ]
+    
+    
+    testSpecifications.loc[1:6,'FalseNegativeRate'] = PCR_FNR_I1_to_R2
+    testSpecifications.loc[9:14,'FalseNegativeRate'] = antigen_FNR_I1_to_R2
+    testSpecifications.loc[17:22,'FalseNegativeRate'] = antibody_FNR_I1_to_R2
+    
+    
+
+    testSpecifications['FalsePositiveRate'] = [ # ratio of negative (non-infected or not immune) people deemed positive by the test
+        # PCR
+        0.01, 0.,0.,0.,0., 0.01, 0.01, 0.,
+
+        # Antigen
+        0.1, 0.,0.,0.,0., 0.1, 0.1, 0.,
+
+        # Antibody
+        0.05, 0.04, 0.03, 0.02, 0.01, 0., 0., 0.        
+    ]
+    
+    testSpecifications.loc[0,'FalsePositiveRate'] = PCR_FPR
+    testSpecifications.loc[5:6,'FalsePositiveRate'] = PCR_FPR
+    testSpecifications.loc[8,'FalsePositiveRate'] = antigen_FPR
+    testSpecifications.loc[13:14,'FalsePositiveRate'] = antigen_FPR
+    testSpecifications.loc[16:20,'FalsePositiveRate'] = antibody_FPR_S_to_I4
+    
+    name = testSpecifications['Name']
+    truePosHealthState = testSpecifications['TruePosHealthState']   
+    testSpecifications.drop(['Name', 'TruePosHealthState'], inplace=True, axis=1)
+    testSpecifications = testSpecifications.to_numpy()
+    name = name.to_numpy()
+    truePosHealthState = truePosHealthState.to_numpy()
+    return testSpecifications, name, truePosHealthState

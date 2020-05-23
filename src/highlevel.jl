@@ -66,8 +66,9 @@ exec(open(os.path.join(os.getcwd(), "coexist_python", "model_COVID_testing-ODEou
 
 function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
   trTensor_diseaseProgression=trFunc_diseaseProgression(param...)
-  dstateTensor=reshape(dstateTensor_vec,(nAge, nHS, nIso, nTest))
-  stateTensor=reshape(stateTensor_vec,(nAge, nHS, nIso, nTest))
+  stateTensor=reshape(stateTensor_vec,(nTest, nIso, nHS, nAge))
+  dstateTensor = zeros(size(stateTensor)...)
+  trTensor_complete = zeros((nTest, nIso, nHS, nTest, nIso, nHS, nAge))
 
   # Efficient Python version
   # # Get disease condition updates with no isolation or test transition ("diagonal along those")
@@ -79,7 +80,6 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
   # @cast from TensorCast only works with two repeeated index
   # https://discourse.julialang.org/t/einstein-convention-for-slicing-or-how-to-view-diagonals-in-tensors/38553/3
   # maybe with CartesianIndex or @views
-  trTensor_complete = zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
   for iso=1:nIso
     for ag=1:nAge
       for hs=1:nHS
@@ -113,6 +113,23 @@ function f_vec!(dstateTensor_vec,stateTensor_vec,p,t)
   end
   dstate[:]=reshape(dstateTensor,(nIso*nAge*nHS*nTest))
 end
+#= This one is close
+  for ag=1:nAge
+    for hs=1:nHS
+      for iso=1:nIso
+        for tst=1:nTest
+          for nhs=1:nHS
+            for niso=1:nIso
+              for ntst=1:nTest
+                dstateTensor[ag,hs,iso,ntst]+=stateTensor[tst,nhs,niso,ntst]* trTensor_complete[ag,hs,iso,tst,nhs,niso,ntst]
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+=#
 
 n=prod([ssize...])
 println(n)

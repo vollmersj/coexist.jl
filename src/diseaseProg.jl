@@ -44,6 +44,9 @@ function einsum(str, a, b)
     if str=="ijkl,j->i"
         return _einsum3(a, b)
     end 
+    if str=="ijkl,ijklmnp->imnp"
+        return _einsum5(a, b)
+    end 		
 end
 
 function einsum(str, a)
@@ -96,6 +99,15 @@ function _einsum4(a) #'ijlml->ijlm'
         end
     end
     return p
+end
+
+function _einsum5(a, b) #'ijkl,ijklmnp->imnp'
+    p, n, m, l, k, j, i = size(b)
+    dydt = zeros(p,n,m,i)	
+    for i=1:i, j=1:j, k=1:k, l=1:l, m=1:m, n=1:n, p=1:p
+        dydt[p,n,m,i] += a[l,k,j,i] * b[p,n,m,l,k,j,i]
+    end
+    return dydt
 end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)

@@ -59,6 +59,8 @@ function einsum(str, a)
       return _einsum8(a)
   elseif str=="ijkljkl->ijkl"
       return _einsum9(a)
+  elseif str=="...jkl->..."
+      return _einsum10(a)
   end
 end
 
@@ -151,6 +153,10 @@ function _einsum9(a) # 'ijkljkl->ijkl'
         p[l,k,j,i] = a[l,k,j,l,k,j,i]
     end
     return p
+end
+
+function _einsum10(a) # '...jkl->...'
+    return reshape(sum(a, dims=[1,2,3]),size(a)[4:end])
 end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)

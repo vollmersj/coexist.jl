@@ -1,5 +1,6 @@
 using coexist, PyCall#env using Conda
 using Test
+using Dates
 
 include("../src/diseaseProg.jl")
 # Install scikit-learn if not installed
@@ -18,10 +19,17 @@ path = os.path.join(relative_path, 'test.py')
 exec(open(path).read())
 """
 
+## Setup for testing
 initial_state = (nAge=9, nHS=8, nIso=4, nI=4, nTest=4, nR=2)
+
+# `trFunc_travelInfectionRate_ageAdjusted`
 t = 10 # Time within simulation
 
-## Setup for testing
+# `trFunc_testCapacity`
+rTime = Date("2020-05-25", "yyyy-mm-dd") # Real Time
+py"""
+_trFunc_testCapacity = __trFunc_testCapacity
+"""
 
 # `inpFunc_testSpecifications`
 _other, _name, __truePosHealthState = py"inpFunc_testSpecifications()"
@@ -55,6 +63,8 @@ other = convert(Array, other)
 	trFunc_HospitalDischarge(;initial_state...)
 	@test py"np.transpose(trFunc_travelInfectionRate_ageAdjusted(10))"≈
 	trFunc_travelInfectionRate_ageAdjusted(t)
+	@test py"_trFunc_testCapacity"==
+	trFunc_testCapacity(Date("2020-05-25", "yyyy-mm-dd"))
 
 	# inpFunc_testSpecifications
 	@test _other == other

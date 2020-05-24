@@ -504,12 +504,12 @@ end
 
 # TODO - MANUAL! - this function is VERY specific to current health state setup, and needs to be manually edited if number of health states change
 function inpFunc_testSpecifications(
-	PCR_FNR_I1_to_R2 = [ 0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
-    PCR_FPR = 0.01,
-    antigen_FNR_I1_to_R2 = [ 0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
-    antigen_FPR = 0.1,
-    antibody_FNR_I1_to_R2 = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05],
-    antibody_FPR_S_to_I4 = [0.05, 0.04, 0.03, 0.02, 0.01];
+	PCR_FNR_I1_to_R2::Array = [ 0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
+    PCR_FPR::Float64 = 0.01,
+    antigen_FNR_I1_to_R2::Array = [ 0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
+    antigen_FPR::Float64 = 0.1,
+    antibody_FNR_I1_to_R2::Array = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05],
+    antibody_FPR_S_to_I4::Array = [0.05, 0.04, 0.03, 0.02, 0.01];
     kwargs...
     )
 
@@ -573,4 +573,53 @@ function inpFunc_testSpecifications(
     testSpecifications[17:21, "FalsePositiveRate"] .= antibody_FPR_S_to_I4
 
     return testSpecifications
+end
+
+function trFunc_testCapacity(
+    realTime::Date, # time within simulation (day)
+    # PCR capacity - initial
+    testCapacity_pcr_phe_total::Float64 = 1e4,
+    testCapacity_pcr_phe_inflexday::Date = Date("2020-03-25", "yyyy-mm-dd"),
+    testCapacity_pcr_phe_inflexslope::Float64 = 5.0,
+
+    # PCR capacity - increased
+    testCapacity_pcr_country_total::Float64 = 1e5,
+    testCapacity_pcr_country_inflexday::Date = Date("2020-04-25", "yyyy-mm-dd"),
+    testCapacity_pcr_country_inflexslope::Float64 = 10.0,
+    
+    # Antibody / antigen capacity
+    testCapacity_antibody_country_firstday::Date = Date("2020-04-25", "yyyy-mm-dd"),
+    
+    testCapacity_antibody_country_total::Float64 = 5e6,
+    testCapacity_antibody_country_inflexday::Date = Date("2020-05-20", "yyyy-mm-dd"),
+    testCapacity_antibody_country_inflexslope::Float64 = 20.0,
+    
+	testCapacity_antigenratio_country::Float64 = 0.7; 
+	
+	kwargs...
+)
+
+    # Returns a dictionary with test names and number available at day "t"
+    outPCR = (
+        #phe phase
+        testCapacity_pcr_phe_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_phe_inflexday))/testCapacity_pcr_phe_inflexslope)
+        +
+        #whole country phase
+        testCapacity_pcr_country_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_country_inflexday))/testCapacity_pcr_country_inflexslope)
+    )
+    
+    
+    if realTime<testCapacity_antibody_country_firstday
+        outAntiTotal = 0.0
+    else
+        outAntiTotal = (
+            testCapacity_antibody_country_total * logistic(Dates.value(Day(realTime-testCapacity_antibody_country_inflexday))/testCapacity_antibody_country_inflexslope)
+		)
+	end
+    
+    return Dict([
+        ("PCR", outPCR), 
+        ("Antigen", outAntiTotal*testCapacity_antigenratio_country), 
+        ("Antibody", outAntiTotal*(1-testCapacity_antigenratio_country))
+	]) # Tuples can be used instead (using dictionary to make it identical to python code
 end

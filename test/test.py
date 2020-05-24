@@ -484,3 +484,57 @@ def inpFunc_testSpecifications(
     name = name.to_numpy()
     truePosHealthState = truePosHealthState.to_numpy()
     return testSpecifications, name, truePosHealthState
+
+def trFunc_testCapacity(
+    realTime, # time within simulation (day)
+    
+    # PCR capacity - initial
+    testCapacity_pcr_phe_total = 1e4,
+    testCapacity_pcr_phe_inflexday = pd.to_datetime("2020-03-25", format="%Y-%m-%d"),
+    testCapacity_pcr_phe_inflexslope = 5.,
+
+    # PCR capacity - increased
+    testCapacity_pcr_country_total = 1e5,
+    testCapacity_pcr_country_inflexday = pd.to_datetime("2020-04-25", format="%Y-%m-%d"),
+    testCapacity_pcr_country_inflexslope = 10,
+    
+    # Antibody / antigen capacity
+    testCapacity_antibody_country_firstday = pd.to_datetime("2020-04-25", format="%Y-%m-%d"),
+    
+    testCapacity_antibody_country_total = 5e6,
+    testCapacity_antibody_country_inflexday = pd.to_datetime("2020-05-20", format="%Y-%m-%d"),
+    testCapacity_antibody_country_inflexslope = 20,
+    
+    testCapacity_antigenratio_country = 0.7,
+    
+    **kwargs
+             
+):
+
+    # Returns a dictionary with test names and number available at day "t"
+    
+    outPCR = (
+        #phe phase
+        testCapacity_pcr_phe_total * expit((realTime-testCapacity_pcr_phe_inflexday).days/testCapacity_pcr_phe_inflexslope)
+        +
+        #whole country phase
+        testCapacity_pcr_country_total * expit((realTime-testCapacity_pcr_country_inflexday).days/testCapacity_pcr_country_inflexslope)
+    )
+    
+    
+    if realTime<testCapacity_antibody_country_firstday:
+        outAntiTotal = 0.
+    else:
+        outAntiTotal = (
+            testCapacity_antibody_country_total * expit((realTime-testCapacity_antibody_country_inflexday).days/testCapacity_antibody_country_inflexslope)
+        )
+    
+    return {
+        "PCR": outPCR,
+        "Antigen": outAntiTotal*testCapacity_antigenratio_country, 
+        "Antibody": outAntiTotal*(1-testCapacity_antigenratio_country)
+    }
+
+# To test the function, in runtests.jl
+py_rTime = pd.to_datetime("2020-05-25", format="%Y-%m-%d")
+__trFunc_testCapacity = trFunc_testCapacity(py_rTime)

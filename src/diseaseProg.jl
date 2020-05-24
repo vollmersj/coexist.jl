@@ -37,22 +37,29 @@ end
 function einsum(str, a, b)
     if str=="ijl,j->i"
         return _einsum1(a, b)
-    end
-    if str=="ijk,j->ik"
+    elseif str=="ijk,j->ik"
         return _einsum2(a, b)
-    end
-    if str=="ijkl,j->i"
+    elseif  str=="ijkl,j->i"
         return _einsum3(a, b)
-    end 
-    if str=="ijkl,ijklmnp->imnp"
+    elseif  str=="ijkl,ijklmnp->imnp"
         return _einsum5(a, b)
-    end 		
+    end
 end
 
 function einsum(str, a)
-   if "ijlml->ijlm" 
-      return _einsum4(a)  
-   end
+   if str=="ijlml->ijlm"
+      return _einsum4(a)
+  elseif str=="ijkj->ijk"
+      return _einsum6(a)
+  elseif str=="iklkl->ikl"
+      return _einsum7(a)
+  elseif str=="ijljl->ijl"
+      return _einsum7(a)
+  elseif str=="ijkljkm->ijklm"
+      return _einsum8(a)
+  elseif str=="ijkljkl->ijkl"
+      return _einsum9(a)
+  end
 end
 
 function _einsum1(a, b) #'ijl,j->i'
@@ -103,11 +110,47 @@ end
 
 function _einsum5(a, b) #'ijkl,ijklmnp->imnp'
     p, n, m, l, k, j, i = size(b)
-    dydt = zeros(p,n,m,i)	
+    dydt = zeros(p,n,m,i)
     for i=1:i, j=1:j, k=1:k, l=1:l, m=1:m, n=1:n, p=1:p
         dydt[p,n,m,i] += a[l,k,j,i] * b[p,n,m,l,k,j,i]
     end
     return dydt
+end
+
+function _einsum6(a) # 'ijkj->ijk'
+    _,k,j,i = size(a)
+    p = zeros(k,j,i)
+    for j=1:j, i=1:i
+        p[:,j,i] = a[j,:,j,i]
+    end
+    return p
+end
+
+function _einsum7(a) # 'ijljl->ijl' & 'iklkl->ikl'
+    _,_,l,k,i = size(a)
+    p = zeros(l,k,i)
+    for i=1:i, k=1:k, l=1:l
+        p[l,k,i] = a[l,k,l,k,i]
+    end
+    return p
+end
+
+function _einsum8(a) # 'ijkljkm->ijklm'
+    m,_,_,l,k,j,i = size(a)
+    p = zeros(m,l,k,j,i)
+    for i=1:i, j=1:j, k=1:k, l=1:l, m=1:m
+        p[m,l,k,j,i] = a[m,k,j,l,k,j,i]
+    end
+    return p
+end
+
+function _einsum9(a) # 'ijkljkl->ijkl'
+    _,_,_,l,k,j,i = size(a)
+    p = zeros(l,k,j,i)
+    for i=1:i, j=1:j, k=1:k, l=1:l
+        p[l,k,j,i] = a[l,k,j,l,k,j,i]
+    end
+    return p
 end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)
@@ -517,12 +560,12 @@ function inpFunc_testSpecifications(
 
     testSpecifications = DataFrame()
     testSpecifications."Name" = vcat(
-                    ["PCR" for i in 1:nHS], 
-                    ["Antigen" for i in 1:nHS], 
+                    ["PCR" for i in 1:nHS],
+                    ["Antigen" for i in 1:nHS],
                     ["Antibody" for i in 1:nHS]
                     )
     testSpecifications."OutputTestState" = vcat(
-                    [1 for i in 1:2*nHS], 
+                    [1 for i in 1:2*nHS],
                     [2 for i in 1:nHS]
                     )
     testSpecifications."TruePosHealthState" = vcat(
@@ -586,16 +629,16 @@ function trFunc_testCapacity(
     testCapacity_pcr_country_total::Float64 = 1e5,
     testCapacity_pcr_country_inflexday::Date = Date("2020-04-25", "yyyy-mm-dd"),
     testCapacity_pcr_country_inflexslope::Float64 = 10.0,
-    
+
     # Antibody / antigen capacity
     testCapacity_antibody_country_firstday::Date = Date("2020-04-25", "yyyy-mm-dd"),
-    
+
     testCapacity_antibody_country_total::Float64 = 5e6,
     testCapacity_antibody_country_inflexday::Date = Date("2020-05-20", "yyyy-mm-dd"),
     testCapacity_antibody_country_inflexslope::Float64 = 20.0,
-    
-	testCapacity_antigenratio_country::Float64 = 0.7; 
-	
+
+	testCapacity_antigenratio_country::Float64 = 0.7;
+
 	kwargs...
 )
 
@@ -607,8 +650,8 @@ function trFunc_testCapacity(
         #whole country phase
         testCapacity_pcr_country_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_country_inflexday))/testCapacity_pcr_country_inflexslope)
     )
-    
-    
+
+
     if realTime<testCapacity_antibody_country_firstday
         outAntiTotal = 0.0
     else
@@ -616,10 +659,10 @@ function trFunc_testCapacity(
             testCapacity_antibody_country_total * logistic(Dates.value(Day(realTime-testCapacity_antibody_country_inflexday))/testCapacity_antibody_country_inflexslope)
 		)
 	end
-    
+
     return Dict([
-        ("PCR", outPCR), 
-        ("Antigen", outAntiTotal*testCapacity_antigenratio_country), 
+        ("PCR", outPCR),
+        ("Antigen", outAntiTotal*testCapacity_antigenratio_country),
         ("Antibody", outAntiTotal*(1-testCapacity_antigenratio_country))
 	]) # Tuples can be used instead (using dictionary to make it identical to python code
 end

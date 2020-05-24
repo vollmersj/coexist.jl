@@ -585,18 +585,18 @@ function trFunc_testCapacity(
     # PCR capacity - increased
     testCapacity_pcr_country_total::Float64 = 1e5,
     testCapacity_pcr_country_inflexday::Date = Date("2020-04-25", "yyyy-mm-dd"),
-    testCapacity_pcr_country_inflexslope::Int64 = 10,
+    testCapacity_pcr_country_inflexslope::Float64 = 10.0,
     
     # Antibody / antigen capacity
     testCapacity_antibody_country_firstday::Date = Date("2020-04-25", "yyyy-mm-dd"),
     
     testCapacity_antibody_country_total::Float64 = 5e6,
     testCapacity_antibody_country_inflexday::Date = Date("2020-05-20", "yyyy-mm-dd"),
-    testCapacity_antibody_country_inflexslope::Int64 = 20,
+    testCapacity_antibody_country_inflexslope::Float64 = 20.0,
     
-    testCapacity_antigenratio_country::Float64 = 0.7;
-    
-    kwargs...            
+	testCapacity_antigenratio_country::Float64 = 0.7; 
+	
+	kwargs...
 )
 
     # Returns a dictionary with test names and number available at day "t"
@@ -621,5 +621,5 @@ function trFunc_testCapacity(
         ("PCR", outPCR), 
         ("Antigen", outAntiTotal*testCapacity_antigenratio_country), 
         ("Antibody", outAntiTotal*(1-testCapacity_antigenratio_country))
-	])
+	]) # Tuples can be used instead (using dictionary to make it identical to python code
 end

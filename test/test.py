@@ -530,7 +530,11 @@ def trFunc_testCapacity(
         )
     
     return {
-        "PCR": outPCR, 
+        "PCR": outPCR,
         "Antigen": outAntiTotal*testCapacity_antigenratio_country, 
         "Antibody": outAntiTotal*(1-testCapacity_antigenratio_country)
     }
+
+# To test the function, in runtests.jl
+py_rTime = pd.to_datetime("2020-05-25", format="%Y-%m-%d")
+__trFunc_testCapacity = trFunc_testCapacity(py_rTime)

@@ -98,18 +98,13 @@ function _einsum3(a, b) #'ijkl,j->i'
 end
 
 function _einsum4(a) #'ijlml->ijlm'
-    v,w,x,y,z = size(a)
-    p = zeros(y,v,y,z)
-    for k in 1:z
-        for j in 1:y
-            for i in 1:v
-                p[:,i,j,k] = a[i,:,i,j,k]
-            end
-        end
+    l,m,l,j,i = size(a)
+    p = zeros(m,l,j,i)
+    for i=1:i, j=1:j, l=1:l
+        p[:,l,j,i] = a[l,:,l,j,i]
     end
     return p
 end
-
 function _einsum5(a, b) #'ijkl,ijklmnp->imnp'
     p, n, m, l, k, j, i = size(b)
     dydt = zeros(p,n,m,i)

@@ -530,7 +530,296 @@ def trFunc_testCapacity(
         )
     
     return {
-        "PCR": outPCR, 
+        "PCR": outPCR,
         "Antigen": outAntiTotal*testCapacity_antigenratio_country, 
         "Antibody": outAntiTotal*(1-testCapacity_antigenratio_country)
     }
+
+# To test the function, in runtests.jl
+py_rTime = pd.to_datetime("2020-05-25", format="%Y-%m-%d")
+__trFunc_testCapacity = trFunc_testCapacity(py_rTime)
+
+
+# PARAMETER DICTIONARIES AND TABLES
+# -----------------------------------------------------------------------------------------
+
+# Build the nested parameter/computation graph of a single function.
+def build_paramDict(cur_func):
+    """
+    This function iterates through all inputs of a function,
+    and saves the default argument names and values into a dictionary.
+
+    If any of the default arguments are functions themselves, then recursively (depth-first) adds an extra field to
+    the dictionary, named <funcName + "_params">, that contains its inputs and arguments.
+
+    The output of this function can then be passed as a "kwargs" object to the highest level function,
+    which will then pass the parameter values to the lower dictionary levels appropriately
+    """
+
+    paramDict = OrderedDict()
+
+    allArgs = inspect.getfullargspec(cur_func)
+
+    # Check if there are any default parameters, if no, just return empty dict
+    if allArgs.defaults is None:
+        return paramDict
+
+
+    for argname, argval in zip(allArgs.args[-len(allArgs.defaults):], allArgs.defaults):
+        # Save the default argument
+        paramDict[argname] = argval
+        # If the default argument is a function, inspect it for further
+
+        if callable(argval):
+            # print(argname)
+            paramDict[argname+"_params"] = build_paramDict(argval)
+
+    return paramDict
+
+# Function that computes the right side of the non-lin model ODE
+def dydt_Complete(t,
+                  stateTensor_flattened, # Might be double the normal size (as first dimension) _withNewOnlyCopy, if debugReturnNewPerDay
+
+                  realStartDate = pd.to_datetime("2020-02-20", format="%Y-%m-%d"),
+
+                  # debug
+                  debugTransition = False,
+                  debugTimestep = False,
+                  debugReturnNewPerDay = True, # Now implemented by default into state iteration
+
+                  # Dimensions
+                  nAge=nAge, nHS=nHS, nI=nI, nR=nR, nIso=nIso, nTest=nTest,
+
+                  # Input functions and tensors
+                  # ----------------------------
+
+                  # Health state updates
+                  trFunc_diseaseProgression = trFunc_diseaseProgression,
+                  trFunc_newInfections = trFunc_newInfections_Complete,
+
+                  # Initial incoming travel-based infections (before restrictions)
+                  trFunc_travelInfectionRate_ageAdjusted = trFunc_travelInfectionRate_ageAdjusted,
+
+                  # Hospitalisation and recovery
+                  trFunc_HospitalAdmission = trFunc_HospitalAdmission,
+                  trFunc_HospitalDischarge = trFunc_HospitalDischarge,
+
+                  # Policy changes (on social distancing for now) (TODO - possibly make more changes)
+                  tStartSocialDistancing = pd.to_datetime("2020-03-23", format="%Y-%m-%d"),
+                  tStopSocialDistancing = pd.to_datetime("2025-03-23", format="%Y-%m-%d"),
+
+                  tStartImmunityPassports = pd.to_datetime("2025-03-23", format="%Y-%m-%d"),
+                  tStopImmunityPassports = pd.to_datetime("2025-03-23", format="%Y-%m-%d"),
+
+                  tStartQuarantineCaseIsolation = pd.to_datetime("2025-03-23", format="%Y-%m-%d"),
+                  tStopQuarantineCaseIsolation = pd.to_datetime("2025-03-23", format="%Y-%m-%d"),
+                #  trFunc_quarantine = trFunc_quarantine_caseIsolation,
+
+                  # Testing
+                  #trFunc_testing = trFunc_testing,
+                  #policyFunc_testing = policyFunc_testing_symptomaticOnly,
+                  #testSpecifications = testSpecifications,
+                  #trFunc_testCapacity = trFunc_testCapacity,
+                  #trFunc_testCapacity_param_testCapacity_antigenratio_country = 0.3
+
+                  **kwargs
+
+):
+    _einsum4_test = None
+    _einsum5_test, _einsum5_test1 = None, None
+    _einsum9_test, _einsum9_test1 = None, None
+
+    if debugTimestep:
+        print(t)
+
+    # Initialise return
+    if debugReturnNewPerDay: # the input has 2 copies of the state tensor, second copy being the cumulative incomings
+        stateTensor = np.reshape(stateTensor_flattened, [2, nAge, nHS, nIso, nTest])[0]
+    else:
+        stateTensor = np.reshape(stateTensor_flattened, [nAge, nHS, nIso, nTest])
+
+    dydt = np.zeros_like(stateTensor)
+
+    # Initialise the full transition tensor
+    trTensor_complete = np.zeros((nAge, nHS, nIso, nTest, nHS, nIso, nTest))
+
+    # Disease condition updates
+    # ---------------------------
+    trTensor_diseaseProgression = trFunc_diseaseProgression(**kwargs["trFunc_diseaseProgression_params"])
+    _trTensor_diseaseProgression = trTensor_diseaseProgression
+    # Get disease condition updates with no isolation or test transition ("diagonal along those")
+    for k1 in [0,1,2,3]:
+        np.einsum('ijlml->ijlm',
+            trTensor_complete[:,:,k1,:,:,k1,:])[:] += np.expand_dims(
+                trTensor_diseaseProgression[:,:,k1,:]
+                ,[2]) # all non-hospitalised disease progression is same
+
+    _einsum4_test = trTensor_complete # trTensor_complete after einsum
+
+#     # Compute new infections (0->1 in HS) with no isolation or test transition ("diagonal along those")
+#     cur_policySocialDistancing = (
+#                     t >= (tStartSocialDistancing - realStartDate).days
+#                 )*(
+#                     t <   (tStopSocialDistancing - realStartDate).days
+#                 )
+#     cur_policyImmunityPassports = (
+#                     t >= (tStartImmunityPassports - realStartDate).days
+#                 )*(
+#                     t <   (tStopImmunityPassports - realStartDate).days
+#                 )
+#     np.einsum('iklkl->ikl',
+#         trTensor_complete[:,0,:,:,1,:,:])[:] += (
+#             trFunc_newInfections(
+#                 stateTensor,
+#                 policySocialDistancing = cur_policySocialDistancing,
+#                 policyImmunityPassports = cur_policyImmunityPassports,
+#                 **kwargs["trFunc_newInfections_params"]
+#             ))
+
+    # Also add new infected from travelling of healthy people, based on time-within-simulation (this is correct with all (0,0) states, as tested or isolated people dont travel)
+#     trTensor_complete[:,0,0,0,1,0,0] += trFunc_travelInfectionRate_ageAdjusted(t, **kwargs["trFunc_travelInfectionRate_ageAdjusted_params"])
+
+
+    # Hospitalisation state updates
+    # -----------------------
+
+    # Hospitalisation and recovery rates
+    # We assume for now that these only depend on age and disease progression, not on testing state
+    # (TODO - update this given new policies)
+
+    # The disease and testing states don't change due to hospitalisation.
+    # Hospital staff is treated as already hospitalised from all aspects expect social mixing, should suffice for now
+    # TODO - Could try to devise a scheme in which hospital staff gets hospitalised and some recoveries from hospitalised state go back to hospital staff.
+    # TODO - same issue with hospital staff home isolating; that's probably more important question!
+#     for k1 in [0,1]:
+#          np.einsum('ijljl->ijl',
+#             trTensor_complete[:,:,k1,:,:,2,:])[:] += np.expand_dims(
+#              trFunc_HospitalAdmission(**kwargs["trFunc_HospitalAdmission_params"]),[2])
+
+#     # Add recovery from hospital rates
+#     # TODO - again here (for now) we assume all discharged people go back to "normal state" instead of home isolation, have to think more on this
+#     np.einsum('ijljl->ijl',
+#             trTensor_complete[:,:,2,:,:,0,:])[:] += np.expand_dims(
+#                  trFunc_HospitalDischarge(**kwargs["trFunc_HospitalDischarge_params"]),[2])
+
+
+
+
+
+    # Testing state updates
+    # ---------------------
+
+    # trFunc_testing returns a stateTensor x testStates output
+    #      after the policyFunc assigns tests that are evaluated according to testSpecifications
+
+    # Diagonal (no transitions) in age, health state and isolation state
+    # (for now, probably TODO: testing positive correlates with new hospitalisation!)
+#     trTensor_testing = trFunc_testing(
+#                                             stateTensor,
+#                                             t,
+#                                             realStartDate,
+#                                             **kwargs["trFunc_testing_params"]
+#                                         )
+
+#     np.einsum('ijkljkm->ijklm',
+#             trTensor_complete)[:] += trTensor_testing
+
+
+    # Quarantine policy
+    # ------------------
+
+    # Check if policy is "on"
+#     if (
+#             t >= (tStartQuarantineCaseIsolation - realStartDate).days
+#         )*(
+#             t <   (tStopQuarantineCaseIsolation - realStartDate).days
+#         ):
+#         # New quarantining only happens to people who are transitioning already from untested to virus positive state
+#         # Therefore here we DO use non-diagonal transitions, and we
+#         #     redistribute the transtion rates given the testing (which was previously assumed not to create transition in isolation state)
+#         trTensor_complete = trFunc_quarantine(
+#                                                 trTensor_complete,
+#                                                 t,
+#                                                 trTensor_testing,
+#                                                 **kwargs["trFunc_quarantine_params"]
+#                                             )
+
+
+
+
+    # Final corrections
+    # -----------------
+
+
+
+    # TODO: simulate aging and normal birth / death (not terribly important on these time scales, but should be quite simple)
+
+
+    # Ensure that every "row" sums to 0 by adding to the diagonal (doesn't create new people out of nowhere)
+    # Extract (writable) diagonal array and subtract the "row"-sums for each initial state
+    np.einsum('ijkljkl->ijkl', trTensor_complete)[:] -= np.einsum('...jkl->...', trTensor_complete)
+
+    _einsum9_test = trTensor_complete # State of trTensor_complete after 9th einsum
+
+    # Compute the actual derivatives
+    dydt = np.einsum('ijkl,ijklmnp->imnp', stateTensor, trTensor_complete) # contract the HS axis, keep age
+    _einsum5_test = dydt # State of dydt after 5th einsum
+
+    if debugReturnNewPerDay:
+        """
+            If this is true, instead of returning the real dydt,
+            return only the positive "incoming" number of people to each state, so we can track "new cases"
+            This needs some approximations, as follows:
+                1. Take the normal transition tensor (with rates potentially > 0)
+                2. From all states re-normalise the outgoing rates to sum at most to 1
+                    (if they were less, keep it, if larger, then this represents
+                    “in this day, all people will leave this state, in these ratios to these states”)
+                3. Multiply only these outgoing rates with the current state
+                    (so the result wont keep the same number of people as normal,
+                    but only represent the “new incomings” for each state)
+        """
+
+        trTensor_complete_newOnly = copy.deepcopy(trTensor_complete)
+
+        # TODO - Think - this is probably unnecessary actually, artifically reduces "new" rates?
+#         # Devide each row by the absolute diagonal rate (that is the sum of the row), but only if its larger than 1
+#         trTensor_complete_newOnly /= (
+#             np.expand_dims(
+#                 np.clip(np.abs(np.einsum('ijkljkl->ijkl', trTensor_complete_newOnly)), a_min=1., a_max=np.inf),
+#                 axis=[4,5,6]
+#             )
+#         )
+
+        # Set the diagonals to zero (no preservation, no outgoing, will end up being the incoming only)
+        np.einsum('ijkljkl->ijkl', trTensor_complete_newOnly)[:] = 0.
+
+        _einsum9_test1 = trTensor_complete_newOnly # State of trTensor_complete_newOnly after 9th einsum
+
+        dydt_newOnly = np.einsum('ijkl,ijklmnp->imnp', stateTensor, trTensor_complete_newOnly)
+        _einsum5_test1 = dydt_newOnly # State of trTensor_complete_newOnly after 5th einsum
+
+        dydt = np.stack([dydt, dydt_newOnly], axis=0)
+
+
+    if debugTransition:
+        return np.reshape(dydt, -1), _trTensor_diseaseProgression, \
+            _einsum4_test, _einsum5_test, _einsum5_test1, _einsum9_test, _einsum9_test1
+
+    return np.reshape(dydt, -1), _trTensor_diseaseProgression, \
+            _einsum4_test, _einsum5_test, _einsum5_test1, _einsum9_test, _einsum9_test1
+
+# To test the function `dydt_Complete`
+stateTensor_init=50.0*np.ones([nAge, nHS, nIso, nTest])
+paramDict_default = build_paramDict(dydt_Complete)
+paramDict_default["dydt_Complete"] = dydt_Complete
+paramDict_default["INIT_stateTensor_init"] = stateTensor_init
+# Example way to set parameters conveniently, here we start quarantining early based on test results
+paramDict_current = copy.deepcopy(paramDict_default)
+paramDict_current["tStartQuarantineCaseIsolation"] = pd.to_datetime("2020-03-23", format="%Y-%m-%d")
+
+paramDict_current["debugReturnNewPerDay"]=False
+
+state = 50*np.ones(9*8*4*4)
+out, _trTensor_diseaseProgression, _einsum4_test, \
+    _einsum5_test, _einsum5_test1, _einsum9_test, _einsum9_test1 \
+        = dydt_Complete(0, state, **paramDict_current)

@@ -29,8 +29,7 @@ t = 10 # Time within simulation
 # `trFunc_testCapacity`
 rTime = Date("2020-05-25", "yyyy-mm-dd") # Real Time
 py"""
-py_rTime = pd.to_datetime("2020-05-25", format="%Y-%m-%d")
-_trFunc_testCapacity = trFunc_testCapacity(py_rTime)
+_trFunc_testCapacity = __trFunc_testCapacity
 """
 
 # `inpFunc_testSpecifications`

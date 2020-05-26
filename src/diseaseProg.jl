@@ -565,27 +565,27 @@ function inpFunc_testSpecifications(
     nHS, nI, nR = kwargs[:nHS], kwargs[:nI], kwargs[:nR]
 
     testSpecifications = DataFrame()
-    testSpecifications."Name" = vcat(
+    testSpecifications.Name = vcat(
                     ["PCR" for i in 1:nHS],
                     ["Antigen" for i in 1:nHS],
                     ["Antibody" for i in 1:nHS]
                     )
-    testSpecifications."OutputTestState" = vcat(
+    testSpecifications.OutputTestState = vcat(
                     [1 for i in 1:2*nHS],
                     [2 for i in 1:nHS]
                     )
-    testSpecifications."TruePosHealthState" = vcat(
+    testSpecifications.TruePosHealthState = vcat(
                     [[i for i in 1:nI] for j in 1:2*nHS],
                     [[i for i in nI+1:nI+nR] for j in 1:nHS]
                     )
     # In some health states some people are true negatives and some are true positives! (No, makes litte sense to use, just account for it in FPR? Only matters for test makers...)
     # testSpecifications['AmbiguousPosHealthState'] = [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(1, nI+1)]*nHS # what information state does a pos test transition you to.
 
-    testSpecifications."InputHealthState" = vcat(0:nHS-1, 0:nHS-1, 0:nHS-1)
+    testSpecifications.InputHealthState = vcat(0:nHS-1, 0:nHS-1, 0:nHS-1)
 
     # These numbers below are "defaults" illustrating the concept, but are modified by the inputs!!!
 
-    testSpecifications."FalseNegativeRate" = [ # ratio of positive (infected / immune) people missed by the test
+    testSpecifications.FalseNegativeRate = [ # ratio of positive (infected / immune) people missed by the test
         # For each health stage:
         #  S -> I1 (asymp) -> I2 (mild symp) -> I3 (symp, sick) -> I4 (symp, less sick) -> R1 / R2 (IgM, IgG avail) -> D
 
@@ -599,12 +599,12 @@ function inpFunc_testSpecifications(
             0.,   0.99,           0.85,          0.8,                 0.65,              0.3, 0.05,  0.
     ]
 
-    testSpecifications[2:7, "FalseNegativeRate"] .= PCR_FNR_I1_to_R2
-    testSpecifications[10:15, "FalseNegativeRate"] .= antigen_FNR_I1_to_R2
-    testSpecifications[18:23, "FalseNegativeRate"] .= antibody_FNR_I1_to_R2
+    testSpecifications[2:7, :FalseNegativeRate] .= PCR_FNR_I1_to_R2
+    testSpecifications[10:15, :FalseNegativeRate] .= antigen_FNR_I1_to_R2
+    testSpecifications[18:23, :FalseNegativeRate] .= antibody_FNR_I1_to_R2
 
 
-    testSpecifications."FalsePositiveRate" = [ # ratio of negative (non-infected or not immune) people deemed positive by the test
+    testSpecifications.FalsePositiveRate = [ # ratio of negative (non-infected or not immune) people deemed positive by the test
         # PCR
         0.01, 0.,0.,0.,0., 0.01, 0.01, 0.,
 
@@ -615,11 +615,11 @@ function inpFunc_testSpecifications(
         0.05, 0.04, 0.03, 0.02, 0.01, 0., 0., 0.
     ]
 
-    testSpecifications[1, "FalsePositiveRate"] = PCR_FPR
-    testSpecifications[6:7, "FalsePositiveRate"] = PCR_FPR
-    testSpecifications[9, "FalsePositiveRate"] = antigen_FPR
-    testSpecifications[14:15, "FalsePositiveRate"] = antigen_FPR
-    testSpecifications[17:21, "FalsePositiveRate"] .= antibody_FPR_S_to_I4
+    testSpecifications[1, :FalsePositiveRate] = PCR_FPR
+    testSpecifications[6:7, :FalsePositiveRate] = PCR_FPR
+    testSpecifications[9, :FalsePositiveRate] = antigen_FPR
+    testSpecifications[14:15, :FalsePositiveRate] = antigen_FPR
+    testSpecifications[17:21, :FalsePositiveRate] .= antibody_FPR_S_to_I4
 
     return testSpecifications
 end

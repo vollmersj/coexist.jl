@@ -14,7 +14,6 @@ PyCall.pyimport_conda("xlrd", "xlrd")
 
 py"""
 import os
-import pandas as pd
 relative_path = os.getcwd()
 path = os.path.join(relative_path, 'test.py')
 exec(open(path).read())

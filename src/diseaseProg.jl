@@ -67,10 +67,8 @@ end
 function _einsum1(a, b) #'ijl,j->i'
     x,_,z = size(a)
     p = zeros(x,z)
-    for i=1:x
-        for j=1:z
-            p[i,j] += dot(a[i,:,j], b)
-        end
+    for i=1:x, j=1:z
+		p[i,j] += dot(a[i,:,j], b)
     end
     return sum(p, dims=1)
 end
@@ -78,10 +76,8 @@ end
 function _einsum2(a, b) #'ijk,j->ik'
     x,_,z = size(a)
     p = zeros(x, z)
-    for i=1:x
-        for j=1:z
-            p[i,j] = dot(a[i,:,j], b)
-        end
+    for i=1:x, j=1:z
+		p[i,j] = dot(a[i,:,j], b)
     end
     return p
 end
@@ -89,10 +85,8 @@ end
 function _einsum3(a, b) #'ijkl,j->i'
     _,x,_,z = size(a)
     p = zeros(x,z)
-    for i=1:z
-        for j=1:x
-           p[j,i] += sum(a[:,j,:,i]*b)
-        end
+    for i=1:z, j=1:x
+		p[j,i] += sum(a[:,j,:,i]*b)
     end
     return sum(p, dims=1)
 end

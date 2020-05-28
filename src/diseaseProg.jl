@@ -65,27 +65,27 @@ function einsum(str, a)
 end
 
 function _einsum1(a, b) #'ijl,j->i'
-    x,_,z = size(a)
-    p = zeros(x,z)
-    for i=1:x, j=1:z
+    i,_,j = size(a)
+    p = zeros(i,j)
+    for i=1:i, j=1:j
 		p[i,j] += dot(a[i,:,j], b)
     end
     return sum(p, dims=1)
 end
 
 function _einsum2(a, b) #'ijk,j->ik'
-    x,_,z = size(a)
-    p = zeros(x, z)
-    for i=1:x, j=1:z
+    i,_,j = size(a)
+    p = zeros(i,j)
+    for i=1:i, j=1:j
 		p[i,j] = dot(a[i,:,j], b)
     end
     return p
 end
 
 function _einsum3(a, b) #'ijkl,j->i'
-    _,x,_,z = size(a)
+    _,j,_,i = size(a)
     p = zeros(x,z)
-    for i=1:z, j=1:x
+    for i=1:i, j=1:j
 		p[j,i] += sum(a[:,j,:,i]*b)
     end
     return sum(p, dims=1)

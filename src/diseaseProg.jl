@@ -84,7 +84,7 @@ end
 
 function _einsum3(a, b) #'ijkl,j->i'
     _,j,_,i = size(a)
-    p = zeros(x,z)
+    p = zeros(j,i)
     for i=1:i, j=1:j
 		p[j,i] += sum(a[:,j,:,i]*b)
     end

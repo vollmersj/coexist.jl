@@ -144,6 +144,14 @@ function _einsum9(a) # 'ijkljkl->ijkl'
     return p
 end
 
+function _einsum11(a, b) # for setting the values in einsum 10
+	_,_,_,l,k,j,i = size(a)
+    for i=1:i, j=1:j, k=1:k, l=1:l
+        a[l,k,j,l,k,j,i] = b[l,k,j,i]
+    end
+    return a
+end
+
 function _einsum10(a) # '...jkl->...'
     return reshape(sum(a, dims=[1,2,3]),size(a)[4:end])
 end
@@ -635,7 +643,7 @@ function trFunc_testCapacity(
 	testCapacity_antigenratio_country::Float64 = 0.7;
 
 	kwargs...
-)
+	)
 
     # Returns a dictionary with test names and number available at day "t"
     outPCR = (

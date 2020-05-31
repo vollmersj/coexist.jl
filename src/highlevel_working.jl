@@ -1,6 +1,5 @@
 using ModelingToolkit
 using DifferentialEquations
-using Einsum
 
 # initial state
 nAge=9

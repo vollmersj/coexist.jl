@@ -1,5 +1,6 @@
 using ModelingToolkit
 using DifferentialEquations
+using Plots
 
 # initial state
 nAge=9

@@ -65,34 +65,28 @@ function einsum(str, a)
 end
 
 function _einsum1(a, b) #'ijl,j->i'
-    x,_,z = size(a)
-    p = zeros(x,z)
-    for i=1:x
-        for j=1:z
-            p[i,j] += dot(a[i,:,j], b)
-        end
+    i,_,j = size(a)
+    p = zeros(i,j)
+    for i=1:i, j=1:j
+		p[i,j] += dot(a[i,:,j], b)
     end
     return sum(p, dims=1)
 end
 
 function _einsum2(a, b) #'ijk,j->ik'
-    x,_,z = size(a)
-    p = zeros(x, z)
-    for i=1:x
-        for j=1:z
-            p[i,j] = dot(a[i,:,j], b)
-        end
+    i,_,j = size(a)
+    p = zeros(i,j)
+    for i=1:i, j=1:j
+		p[i,j] = dot(a[i,:,j], b)
     end
     return p
 end
 
 function _einsum3(a, b) #'ijkl,j->i'
-    _,x,_,z = size(a)
-    p = zeros(x,z)
-    for i=1:z
-        for j=1:x
-           p[j,i] += sum(a[:,j,:,i]*b)
-        end
+    _,j,_,i = size(a)
+    p = zeros(j,i)
+    for i=1:i, j=1:j
+		p[j,i] += sum(a[:,j,:,i]*b)
     end
     return sum(p, dims=1)
 end
@@ -148,6 +142,14 @@ function _einsum9(a) # 'ijkljkl->ijkl'
         p[l,k,j,i] = a[l,k,j,l,k,j,i]
     end
     return p
+end
+
+function _einsum11(a, b) # for setting the values in einsum 10
+	_,_,_,l,k,j,i = size(a)
+    for i=1:i, j=1:j, k=1:k, l=1:l
+        a[l,k,j,l,k,j,i] = b[l,k,j,i]
+    end
+    return a
 end
 
 function _einsum10(a) # '...jkl->...'
@@ -641,7 +643,7 @@ function trFunc_testCapacity(
 	testCapacity_antigenratio_country::Float64 = 0.7;
 
 	kwargs...
-)
+	)
 
     # Returns a dictionary with test names and number available at day "t"
     outPCR = (

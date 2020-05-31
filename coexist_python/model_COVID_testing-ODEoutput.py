@@ -96,7 +96,7 @@ import itertools
 # In[4]:
 
 
-os.getcwd()
+path_to_get_back = os.getcwd()
 
 
 # In[5]:
@@ -1816,12 +1816,11 @@ def dydt_Complete(t,
     # ---------------------------
     trTensor_diseaseProgression = trFunc_diseaseProgression(**kwargs["trFunc_diseaseProgression_params"])
     # Get disease condition updates with no isolation or test transition ("diagonal along those")
-    for k1 in [0,1,2,3]:
+    for k1 in [0, 1, 2, 3]:
         np.einsum('ijlml->ijlm',
             trTensor_complete[:,:,k1,:,:,k1,:])[:] += np.expand_dims(
                 trTensor_diseaseProgression[:,:,k1,:]
                 ,[2]) # all non-hospitalised disease progression is same
-    temp = trTensor_diseaseProgression
 #     # Compute new infections (0->1 in HS) with no isolation or test transition ("diagonal along those")
 #     cur_policySocialDistancing = (
 #                     t >= (tStartSocialDistancing - realStartDate).days
@@ -1964,9 +1963,9 @@ def dydt_Complete(t,
 
 
     if debugTransition:
-        return np.reshape(dydt, -1), temp
+        return np.reshape(dydt, -1)
 
-    return np.reshape(dydt, -1), temp
+    return np.reshape(dydt, -1)
 
 
 
@@ -2069,9 +2068,7 @@ stateTensor_init=50.0* np.ones([nAge, nHS, nIso, nTest])
 paramDict_current["debugReturnNewPerDay"]=False
 
 state = 50*np.ones(9*8*4*4)
-out, t = dydt_Complete(0, state, **paramDict_current)
-test = np.transpose(t)
-test1 = t
+out = dydt_Complete(0, state, **paramDict_current)
 
 # In[41]:
 
@@ -2094,3 +2091,4 @@ test1 = t
 
 
 # %%
+os.chdir(path_to_get_back)

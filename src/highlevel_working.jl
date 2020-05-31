@@ -1,5 +1,6 @@
 using ModelingToolkit
 using DifferentialEquations
+using Plots
 
 # initial state
 nAge=9
@@ -32,7 +33,7 @@ import os
 exec(open(os.path.join(os.getcwd(), "coexist_python", "model_COVID_testing-ODEoutput.py")).read())
 """
 
-function dydt_Complete(t, stateTensor_flattened)
+function dydt_Complete(stateTensor_flattened,p,t)
 	stateTensor = reshape(stateTensor_flattened, (nTest, nIso, nHS, nAge))
 	dydt = zeros(size(stateTensor)...)
 	trTensor_complete = zeros((nTest, nIso, nHS, nTest, nIso, nHS, nAge))
@@ -62,8 +63,17 @@ function dydt_Complete(t, stateTensor_flattened)
 end
 
 state = 50*ones(9*8*4*4)
-r = dydt_Complete(0, state)
+r = dydt_Complete(state,0,nothing)
 
 @testset "dydt_Complete" begin
 	@test r == py"out"
 end
+
+prob = ODEProblem(dydt_Complete,state,(0.0,80.0),p=nothing)
+sol = solve(prob,Tsit5(),reltol=1e-3,abstol=1e-3)
+sol = convert(Array, sol)
+sol = reshape(sol, (4,4,8,9, Int64(prod(size(sol))/(4*4*8*9))))
+
+number_of_deaths = sum(sol[:,:,8,:,:], dims=[1,2,3]) # the last dim is time
+number_of_deaths = reshape(number_of_deaths, prod(size(number_of_deaths)))
+plot(1:prod(size(number_of_deaths)), number_of_deaths)

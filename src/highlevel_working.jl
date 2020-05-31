@@ -39,20 +39,23 @@ function dydt_Complete(t, stateTensor_flattened)
 	trTensor_complete = zeros((nTest, nIso, nHS, nTest, nIso, nHS, nAge))
 	trTensor_diseaseProgression = trFunc_diseaseProgression(;param...)
 	for k in 1:4
-		_s = size(trTensor_diseaseProgression[:,k,:,:])
-		_y = reshape(trTensor_diseaseProgression[:,k,:,:], (_s[1:end-2]..., 1, _s[end-1:end]...))
-		_t = trTensor_complete[:,k,:,:,k,:,:]
-		@einsum _temp[m,l,j,i] := _t[l,m,l,j,i]
-		_temp .+= _y
-		@einsum _t[l,m,l,j,i] = _temp[m,l,j,i]
-		trTensor_complete[:,k,:,:,k,:,:] = _t
+		shape = size(trTensor_diseaseProgression[:,k,:,:])
+		expand_dims = reshape(trTensor_diseaseProgression[:,k,:,:],
+					(shape[1:end-2]..., 1, shape[end-1:end]...)) # equal to np.exapand_dims
+		# slice = trTensor_complete[:,k,:,:,k,:,:]
+		# @einsum view[m,l,j,i] := slice[l,m,l,j,i]
+		view = einsum("ijlml->ijlm", trTensor_complete[:,k,:,:,k,:,:])
+		view .+= expand_dims
+		trTensor_complete[:,k,:,:,k,:,:] = _einsum12(trTensor_complete[:,k,:,:,k,:,:], view)
+		# @einsum slice[l,m,l,j,i] = view[m,l,j,i]
+		# trTensor_complete[:,k,:,:,k,:,:] = slice
 	end
 
-	# @einsum _mod[l,k,j,i] := trTensor_complete[l,k,j,l,k,j,i]
-	_mod = einsum("ijkljkl->ijkl", trTensor_complete)
-	_mod .-= einsum("...jkl->...", trTensor_complete)
-	# @einsum trTensor_complete[l,k,j,l,k,j,i] = _temp[l,k,j,i]
-	trTensor_complete = _einsum11(trTensor_complete, _mod)
+	# @einsum to_be_modified[l,k,j,i] := trTensor_complete[l,k,j,l,k,j,i]
+	to_be_modified = einsum("ijkljkl->ijkl", trTensor_complete)
+	to_be_modified .-= einsum("...jkl->...", trTensor_complete)
+	# @einsum trTensor_complete[l,k,j,l,k,j,i] = view[l,k,j,i]
+	trTensor_complete = _einsum11(trTensor_complete, to_be_modified)
 
 
 	dydt = einsum("ijkl,ijklmnp->imnp", stateTensor, trTensor_complete)
@@ -62,6 +65,6 @@ end
 state = 50*ones(9*8*4*4)
 r = dydt_Complete(0, state)
 
-@testset "lol" begin
+@testset "dydt_Complete" begin
 	@test r == py"out"
 end

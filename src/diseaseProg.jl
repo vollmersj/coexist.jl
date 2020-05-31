@@ -99,6 +99,15 @@ function _einsum4(a) #'ijlml->ijlm'
     end
     return p
 end
+
+function _einsum12(a, b) # for setting the values in einsum 4
+	l,m,l,j,i = size(a)
+	for i=1:i, j=1:j, l=1:l
+        a[l,:,l,j,i] = b[:,l,j,i]
+    end
+    return a
+end
+
 function _einsum5(a, b) #'ijkl,ijklmnp->imnp'
     p, n, m, l, k, j, i = size(b)
     dydt = zeros(p,n,m,i)

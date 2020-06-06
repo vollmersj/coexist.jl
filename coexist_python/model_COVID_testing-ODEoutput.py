@@ -2068,7 +2068,14 @@ stateTensor_init=50.0* np.ones([nAge, nHS, nIso, nTest])
 paramDict_current["debugReturnNewPerDay"]=False
 
 state = 50*np.ones(9*8*4*4)
-out = dydt_Complete(0, state, **paramDict_current)
+from timeit import default_timer as timer
+start = timer()
+dydt_Complete(0, state, **paramDict_current)
+print('dydt_Complete', timer()-start)
+
+start = timer()
+solveSystem(state, 80, **paramDict_current)
+print('solveSystem', timer()-start)
 
 # In[41]:
 

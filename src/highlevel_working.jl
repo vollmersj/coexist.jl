@@ -1,7 +1,7 @@
 using ModelingToolkit
 using DifferentialEquations
 using Plots
-
+using BenchmarkTools
 # initial state
 nAge=9
 nHS=8
@@ -69,11 +69,37 @@ r = dydt_Complete(state,0,nothing)
 	@test r == py"out"
 end
 
-prob = ODEProblem(dydt_Complete,state,(0.0,80.0),p=nothing)
-sol = solve(prob,Tsit5(),reltol=1e-3,abstol=1e-3)
-sol = convert(Array, sol)
-sol = reshape(sol, (4,4,8,9, Int64(prod(size(sol))/(4*4*8*9))))
+function solveSystem(
+	state,
+	timeSpan = (0.0, 80.0),
+	p=nothing
+	)
+	prob = ODEProblem(dydt_Complete,state,(0.0,80.0),p=nothing)
+	sol = solve(prob,Tsit5(),reltol=1e-3,abstol=1e-3)
+	sol = convert(Array, sol)
+	return reshape(sol, (4,4,8,9, Int64(prod(size(sol))/(4*4*8*9))))
+end
 
-number_of_deaths = sum(sol[:,:,8,:,:], dims=[1,2,3]) # the last dim is time
-number_of_deaths = reshape(number_of_deaths, prod(size(number_of_deaths)))
-plot(1:prod(size(number_of_deaths)), number_of_deaths)
+dydt_benchmark = @benchmark dydt_Complete(state, nothing, 0)
+solveSystem_benchmark = @benchmark solveSystem(state)
+println("BENCHMARK OF dydt_Complete")
+display(dydt_benchmark)
+println()
+println("BENCHMARK OF solveSystem")
+display(solveSystem_benchmark)
+println()
+
+# SUITE["dydt_Complete"] = @benchmarkable dydt_Complete(state, nothing, 0)
+# SUITE["solveSystem"] = @benchmarkable solveSystem(state)
+# number_of_deaths = sum(sol[:,:,8,:,:], dims=[1,2,3]) # the last dim is time
+# number_of_deaths = reshape(number_of_deaths, prod(size(number_of_deaths)))
+# plot(1:prod(size(number_of_deaths)), number_of_deaths)
+py_dydt_benchmark = @benchmark py"solveSystem(state, 80, **paramDict_current)"
+py_solveSystem_benchmark = @benchmark py"solveSystem(state, 80, **paramDict_current)"
+
+println("BENCHMARK OF py_dydt_Complete")
+display(py_dydt_benchmark)
+println()
+println("BENCHMARK OF py_solveSystem")
+display(py_solveSystem_benchmark)
+println()

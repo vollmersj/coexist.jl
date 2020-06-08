@@ -1,16 +1,7 @@
 using coexist, PyCall#env using Conda
 using Test
 using Dates
-
-include("../src/diseaseProg.jl")
-# Install scikit-learn if not installed
-PyCall.pyimport_conda("pandas", "pandas")
-PyCall.pyimport_conda("numpy", "numpy")
-PyCall.pyimport_conda("scipy", "scipy")
-PyCall.pyimport_conda("dask", "dask")
-PyCall.pyimport_conda("cloudpickle", "cloudpickle")
-PyCall.pyimport_conda("distributed", "distributed")
-PyCall.pyimport_conda("xlrd", "xlrd")
+coexist.pycoexist_setup()
 
 py"""
 import os
@@ -33,7 +24,7 @@ _trFunc_testCapacity = __trFunc_testCapacity
 
 # `inpFunc_testSpecifications`
 _other, _name, __truePosHealthState = py"inpFunc_testSpecifications()"
-other = inpFunc_testSpecifications(;initial_state...)
+other = coexist.inpFunc_testSpecifications(;initial_state...)
 name = convert(Array, select(other, :Name))
 name = reshape(name, size(name)[1])
 _truePosHealthState = [[] for i in 1:size(__truePosHealthState)[1]]

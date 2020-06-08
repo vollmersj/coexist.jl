@@ -1,16 +1,10 @@
 # Library Imports
-using DataFrames
-using CSVFiles
-using LinearAlgebra
-using Dates
-import StatsFuns: logistic, gammapdf
 
 #Based on England data (CHESS and NHS England)
 # I want a way to keep this as the "average" disease progression,
 # but modify it such that old people have less favorable outcomes (as observed)
 # But correspondingly I want people at lower risk to have more favorable outcome on average
-const MODULE_DIR = dirname(@__FILE__)
-const DATA_DIR = joinpath(MODULE_DIR, "..", "data")
+
 # For calculations see data_cleaning_py.ipynb, calculations from NHS England dataset as per 05 Apr
 relativeDeathRisk_given_COVID_by_age = [-0.99742186, -0.99728639, -0.98158438,
                                         -0.9830432 , -0.82983414, -0.84039294,
@@ -34,73 +28,73 @@ function _agePopulationRatio(agePopulationTotal)
     return agePopulationTotal/sum(agePopulationTotal)
 end
 
-function einsum(str, a, b)
+function einsum(str, a, b, T)
     if str=="ijl,j->i"
-        return _einsum1(a, b)
+        return _einsum1(a, b, T)
     elseif str=="ijk,j->ik"
-        return _einsum2(a, b)
+        return _einsum2(a, b, T)
     elseif  str=="ijkl,j->i"
-        return _einsum3(a, b)
+        return _einsum3(a, b, T)
     elseif  str=="ijkl,ijklmnp->imnp"
-        return _einsum5(a, b)
+        return _einsum5(a, b, T)
     end
 end
 
-function einsum(str, a)
+function einsum(str, a, T)
    if str=="ijlml->ijlm"
-      return _einsum4(a)
+      return _einsum4(a, T)
   elseif str=="ijkj->ijk"
-      return _einsum6(a)
+      return _einsum6(a, T)
   elseif str=="iklkl->ikl"
-      return _einsum7(a)
+      return _einsum7(a, T)
   elseif str=="ijljl->ijl"
-      return _einsum7(a)
+      return _einsum7(a, T)
   elseif str=="ijkljkm->ijklm"
-      return _einsum8(a)
+      return _einsum8(a, T)
   elseif str=="ijkljkl->ijkl"
-      return _einsum9(a)
+      return _einsum9(a, T)
   elseif str=="...jkl->..."
-      return _einsum10(a)
+      return _einsum10(a, T)
   end
 end
 
-function _einsum1(a, b) #'ijl,j->i'
+function _einsum1(a, b, T) #'ijl,j->i'
     i,_,j = size(a)
-    p = zeros(i,j)
+    p = zeros(T,i,j)
     for i=1:i, j=1:j
 		p[i,j] += dot(a[i,:,j], b)
     end
     return sum(p, dims=1)
 end
 
-function _einsum2(a, b) #'ijk,j->ik'
+function _einsum2(a, b, T) #'ijk,j->ik'
     i,_,j = size(a)
-    p = zeros(i,j)
+    p = zeros(T,i,j)
     for i=1:i, j=1:j
 		p[i,j] = dot(a[i,:,j], b)
     end
     return p
 end
 
-function _einsum3(a, b) #'ijkl,j->i'
+function _einsum3(a, b, T) #'ijkl,j->i'
     _,j,_,i = size(a)
-    p = zeros(j,i)
+    p = zeros(T,j,i)
     for i=1:i, j=1:j
 		p[j,i] += sum(a[:,j,:,i]*b)
     end
     return sum(p, dims=1)
 end
 
-function _einsum4(a) #'ijlml->ijlm'
+function _einsum4(a, T) #'ijlml->ijlm'
     l,m,l,j,i = size(a)
-    p = zeros(m,l,j,i)
+    p = zeros(T,m,l,j,i)
     for i=1:i, j=1:j, l=1:l
         p[:,l,j,i] = a[l,:,l,j,i]
     end
     return p
 end
 
-function _einsum12(a, b) # for setting the values in einsum 4
+function _einsum12(a, b, T) # for setting the values in einsum 4
 	l,m,l,j,i = size(a)
 	for i=1:i, j=1:j, l=1:l
         a[l,:,l,j,i] = b[:,l,j,i]
@@ -108,52 +102,52 @@ function _einsum12(a, b) # for setting the values in einsum 4
     return a
 end
 
-function _einsum5(a, b) #'ijkl,ijklmnp->imnp'
+function _einsum5(a, b, T) #'ijkl,ijklmnp->imnp'
     p, n, m, l, k, j, i = size(b)
-    dydt = zeros(p,n,m,i)
+    dydt = zeros(T,p,n,m,i)
     for i=1:i, j=1:j, k=1:k, l=1:l, m=1:m, n=1:n, p=1:p
         dydt[p,n,m,i] += a[l,k,j,i] * b[p,n,m,l,k,j,i]
     end
     return dydt
 end
 
-function _einsum6(a) # 'ijkj->ijk'
+function _einsum6(a, T) # 'ijkj->ijk'
     _,k,j,i = size(a)
-    p = zeros(k,j,i)
+    p = zeros(T,k,j,i)
     for j=1:j, i=1:i
         p[:,j,i] = a[j,:,j,i]
     end
     return p
 end
 
-function _einsum7(a) # 'ijljl->ijl' & 'iklkl->ikl'
+function _einsum7(a, T) # 'ijljl->ijl' & 'iklkl->ikl'
     _,_,l,k,i = size(a)
-    p = zeros(l,k,i)
+    p = zeros(T,l,k,i)
     for i=1:i, k=1:k, l=1:l
         p[l,k,i] = a[l,k,l,k,i]
     end
     return p
 end
 
-function _einsum8(a) # 'ijkljkm->ijklm'
+function _einsum8(a, T) # 'ijkljkm->ijklm'
     m,_,_,l,k,j,i = size(a)
-    p = zeros(m,l,k,j,i)
+    p = zeros(T,m,l,k,j,i)
     for i=1:i, j=1:j, k=1:k, l=1:l, m=1:m
         p[m,l,k,j,i] = a[m,k,j,l,k,j,i]
     end
     return p
 end
 
-function _einsum9(a) # 'ijkljkl->ijkl'
+function _einsum9(a, T) # 'ijkljkl->ijkl'
     _,_,_,l,k,j,i = size(a)
-    p = zeros(l,k,j,i)
+    p = zeros(T,l,k,j,i)
     for i=1:i, j=1:j, k=1:k, l=1:l
         p[l,k,j,i] = a[l,k,j,l,k,j,i]
     end
     return p
 end
 
-function _einsum11(a, b) # for setting the values in einsum 10
+function _einsum11(a, b, T) # for setting the values in einsum 10
 	_,_,_,l,k,j,i = size(a)
     for i=1:i, j=1:j, k=1:k, l=1:l
         a[l,k,j,l,k,j,i] = b[l,k,j,i]
@@ -161,7 +155,7 @@ function _einsum11(a, b) # for setting the values in einsum 10
     return a
 end
 
-function _einsum10(a) # '...jkl->...'
+function _einsum10(a, T) # '...jkl->...'
     return reshape(sum(a, dims=[1,2,3]),size(a)[4:end])
 end
 

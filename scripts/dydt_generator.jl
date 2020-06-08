@@ -80,7 +80,7 @@ function solveSystem(
 	prob = ODEProblem(f,state,(0.0,80.0),p=nothing)
 	sol = solve(prob,Tsit5(),reltol=1e-3,abstol=1e-3)
 	sol = convert(Array, sol)
-	return reshape(sol, (4,4,8,9, Int64(prod(size(sol))/(4*4*8*9))))
+	reshape(sol, (4,4,8,9, length(sol) ÷ (4*4*8*9)))
 end
 
 using BenchmarkTools

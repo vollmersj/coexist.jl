@@ -40,7 +40,7 @@ function dydt_Complete(stateTensor_flattened,p,t)
 
 
 	dydt = coexist.einsum("ijkl,ijklmnp->imnp", stateTensor, trTensor_complete, T)
-	return reshape(dydt, prod(size(dydt)))
+	return vec(dydt)
 end
 
 state = 50*ones(9*8*4*4)

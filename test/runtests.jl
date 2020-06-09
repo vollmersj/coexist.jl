@@ -1,7 +1,7 @@
-using coexist, PyCall#env using Conda
+using Coexist, PyCall#env using Conda
 using Test
 using Dates
-coexist.pycoexist_setup()
+Coexist.pyCoexist_setup()
 
 py"""
 import os
@@ -24,7 +24,7 @@ _trFunc_testCapacity = __trFunc_testCapacity
 
 # `inpFunc_testSpecifications`
 _other, _name, __truePosHealthState = py"inpFunc_testSpecifications()"
-other = coexist.inpFunc_testSpecifications(;initial_state...)
+other = Coexist.inpFunc_testSpecifications(;initial_state...)
 name = convert(Array, select(other, :Name))
 name = reshape(name, size(name)[1])
 _truePosHealthState = [[] for i in 1:size(__truePosHealthState)[1]]

@@ -1,3 +1,3 @@
-using BenchmarkTools, coexist
+using BenchmarkTools, Coexist
 
 SUITE = BenchmarkGroup()

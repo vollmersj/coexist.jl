@@ -1,4 +1,4 @@
-function pycoexist_setup()
+function pyCoexist_setup()
     PyCall.pyimport_conda("pandas", "pandas")
     PyCall.pyimport_conda("numpy", "numpy")
     PyCall.pyimport_conda("scipy", "scipy")

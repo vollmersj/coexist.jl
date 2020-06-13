@@ -1,4 +1,4 @@
-module coexist
+module Coexist
 
 using DataFrames
 using CSVFiles
@@ -12,6 +12,6 @@ const DATA_DIR = joinpath(dirname(@__FILE__), "..", "data")
 include("diseaseProg.jl")
 include("utils.jl")
 include("generated_dydt.jl")
-include("pycoexist.jl")
+include("pyCoexist.jl")
 
 end # module

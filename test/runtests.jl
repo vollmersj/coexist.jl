@@ -1,7 +1,8 @@
-using coexist, PyCall#env using Conda
+using Coexist, PyCall#env using Conda
 using Test
 using Dates
-coexist.pycoexist_setup()
+using DataFrames
+Coexist.pyCoexist_setup()
 
 py"""
 import os
@@ -24,7 +25,7 @@ _trFunc_testCapacity = __trFunc_testCapacity
 
 # `inpFunc_testSpecifications`
 _other, _name, __truePosHealthState = py"inpFunc_testSpecifications()"
-other = coexist.inpFunc_testSpecifications(;initial_state...)
+other = Coexist.inpFunc_testSpecifications(;initial_state...)
 name = convert(Array, select(other, :Name))
 name = reshape(name, size(name)[1])
 _truePosHealthState = [[] for i in 1:size(__truePosHealthState)[1]]
@@ -47,25 +48,25 @@ other = convert(Array, other)
 
 @testset "DiseaseProg & HospitalAdmission" begin
     @test  py"np.transpose(trFunc_diseaseProgression())"==
-	trFunc_diseaseProgression(;initial_state...)
+	Coexist.trFunc_diseaseProgression(;initial_state...)
 	@test py"np.transpose(trFunc_HospitalAdmission())"≈ # Approximate equality?
-	trFunc_HospitalAdmission(;initial_state...)
+	Coexist.trFunc_HospitalAdmission(;initial_state...)
 	@test py"np.transpose(trFunc_HospitalDischarge())"≈
-	trFunc_HospitalDischarge(;initial_state...)
+	Coexist.trFunc_HospitalDischarge(;initial_state...)
 	@test py"np.transpose(trFunc_travelInfectionRate_ageAdjusted(10))"≈
-	trFunc_travelInfectionRate_ageAdjusted(t)
+	Coexist.trFunc_travelInfectionRate_ageAdjusted(t)
 	@test py"_trFunc_testCapacity"==
-	trFunc_testCapacity(Date("2020-05-25", "yyyy-mm-dd"))
+	Coexist.trFunc_testCapacity(Date("2020-05-25", "yyyy-mm-dd"))
 
 	# inpFunc_testSpecifications
 	@test _other == other
 	@test _name == name
 	@test _truePosHealthState == truePosHealthState
 
-	@test py"ageSocialMixingBaseline" ≈ ageSocialMixingBaseline
-	@test py"ageSocialMixingDistancing" ≈ ageSocialMixingDistancing
-	@test transpose(einsum("ijk,j->ik", stateTensor[3:end,4,2:(4+1),:], transmissionInfectionStage)*(ageSocialMixingBaseline.-ageSocialMixingDistancing))≈
+	@test py"ageSocialMixingBaseline" ≈ Coexist.ageSocialMixingBaseline
+	@test py"ageSocialMixingDistancing" ≈ Coexist.ageSocialMixingDistancing
+	@test transpose(Coexist.einsum("ijk,j->ik", Coexist.stateTensor[3:end,4,2:(4+1),:], Coexist.transmissionInfectionStage, eltype(Coexist.transmissionInfectionStage))*(Coexist.ageSocialMixingBaseline.-Coexist.ageSocialMixingDistancing))≈
 	py"np.matmul(ageSocialMixingBaseline-ageSocialMixingDistancing,np.einsum('ijk,j->ik',stateTensor[:,1:(4+1),3,2:], transmissionInfectionStage))"
 	@test py"trFunc_newInfections_Complete(stateTensor=stateTensor,policySocialDistancing=False, policyImmunityPassports=True)"≈
-	permutedims(trFunc_newInfections_Complete(stateTensor,false,true;initial_state...),[3,2,1])
+	permutedims(Coexist.trFunc_newInfections_Complete(Coexist.stateTensor,false,true;initial_state...),[3,2,1])
 end

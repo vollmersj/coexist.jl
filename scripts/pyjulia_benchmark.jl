@@ -1,5 +1,5 @@
-using coexist, PyCall
-coexist.pycoexist_setup()
+using Coexist, PyCall
+Coexist.pyCoexist_setup()
 
 pydir = joinpath(@__DIR__,"..", "coexist_python", "model_COVID_testing-ODEoutput.py")
 py"""
@@ -15,13 +15,13 @@ function solveSystem(
 	timeSpan = (0.0, 80.0),
 	p=nothing
 	)
-	prob = ODEProblem(coexist.dydt,state,(0.0,80.0),p=nothing)
+	prob = ODEProblem(Coexist.dydt,state,(0.0,80.0),p=nothing)
 	sol = solve(prob,Tsit5(),reltol=1e-3,abstol=1e-3)
 	sol = convert(Array, sol)
 	return reshape(sol, (4,4,8,9, Int64(prod(size(sol))/(4*4*8*9))))
 end
 
-dydt_benchmark = @benchmark coexist.dydt(dstate,state,0,nothing)
+dydt_benchmark = @benchmark Coexist.dydt(dstate,state,0,nothing)
 solveSystem_benchmark = @benchmark solveSystem(state)
 py_dydt_benchmark = @benchmark py"solveSystem(state, 80, **paramDict_current)"
 py_solveSystem_benchmark = @benchmark py"solveSystem(state, 80, **paramDict_current)"

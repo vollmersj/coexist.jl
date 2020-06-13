@@ -456,7 +456,7 @@ function trFunc_newInfections_Complete(
         for k2 in [1, 4]
             ageIsoContractionRate[:,k1,:] .+= reshape(
                   ( einsum("ijl,j->i",
-                    stateTensor[:,k2,2:(nI+1),:], transmissionInfectionStage) * # all infected in non-isolation
+                    stateTensor[:,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)) * # all infected in non-isolation
                     curNonIsolatedSocialMixing
                   ),
                 (1, size(curNonIsolatedSocialMixing)[1]...)
@@ -473,7 +473,7 @@ function trFunc_newInfections_Complete(
             for k2 in [1, 4]
                 ageIsoContractionRate[3:end,k1,:] .+=
                          einsum("ijk,j->ik",
-                         stateTensor[3:end,k2,2:(nI+1),:], transmissionInfectionStage)* # all infected in non-isolation
+                         stateTensor[3:end,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-isolation
                          (ageSocialMixingBaseline.-curNonIsolatedSocialMixing)
             end
         end
@@ -483,7 +483,7 @@ function trFunc_newInfections_Complete(
     for k1 in [1, 4]
         ageIsoContractionRate[:,k1,:] .+= reshape(
               (einsum("ijl,j->i",
-               stateTensor[:,2,2:(nI+1),:], transmissionInfectionStage)* # all infected in isolation
+               stateTensor[:,2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in isolation
                ageSocialMixingIsolation
               ),
             (1, size(ageSocialMixingIsolation )[1]...)
@@ -493,7 +493,7 @@ function trFunc_newInfections_Complete(
     for k1 in [1, 4]
         ageIsoContractionRate[:,1,:] .+= reshape(
                (einsum("ijl,j->i",
-                stateTensor[:,k1,2:(nI+1),:], transmissionInfectionStage)* # all infected in non-hospital, non-isolation
+                stateTensor[:,k1,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-hospital, non-isolation
                 ageSocialMixingIsolation
                ),
             (1, size(ageSocialMixingIsolation )[1]...)
@@ -507,7 +507,7 @@ function trFunc_newInfections_Complete(
     ageIsoContractionRate[:,3:end,:] .+= reshape(
                   withinHospitalSocialMixing *
                   einsum("ijkl,j->i",
-                 stateTensor[:,3:end,2:(nI+1),:], transmissionInfectionStage), # all infected in hospital (sick or working)
+                 stateTensor[:,3:end,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)), # all infected in hospital (sick or working)
         (1, 1, size(stateTensor)[end]...)
         )
     return ageIsoContractionRate/sum(stateTensor) # Normalise the rate by total population

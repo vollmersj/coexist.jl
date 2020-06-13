@@ -2,7 +2,7 @@ using ModelingToolkit
 using DifferentialEquations
 using Plots
 using BenchmarkTools
-using coexist
+using Coexist
 
 # initial state
 nAge=9
@@ -18,28 +18,28 @@ function dydt_Complete(stateTensor_flattened,p,t)
 	stateTensor = reshape(stateTensor_flattened, (nTest, nIso, nHS, nAge))
 	dydt = zeros(T,size(stateTensor)...)
 	trTensor_complete = zeros(T,(nTest, nIso, nHS, nTest, nIso, nHS, nAge))
-	trTensor_diseaseProgression = coexist.trFunc_diseaseProgression(;param...)
+	trTensor_diseaseProgression = Coexist.trFunc_diseaseProgression(;param...)
 	for k in 1:4
 		shape = size(trTensor_diseaseProgression[:,k,:,:])
 		expand_dims = reshape(trTensor_diseaseProgression[:,k,:,:],
 					(shape[1:end-2]..., 1, shape[end-1:end]...)) # equal to np.exapand_dims
 		# slice = trTensor_complete[:,k,:,:,k,:,:]
 		# @einsum view[m,l,j,i] := slice[l,m,l,j,i]
-		view = coexist.einsum("ijlml->ijlm", trTensor_complete[:,k,:,:,k,:,:],T)
+		view = Coexist.einsum("ijlml->ijlm", trTensor_complete[:,k,:,:,k,:,:],T)
 		view .+= expand_dims
-		trTensor_complete[:,k,:,:,k,:,:] = coexist._einsum12(trTensor_complete[:,k,:,:,k,:,:], view, T)
+		trTensor_complete[:,k,:,:,k,:,:] = Coexist._einsum12(trTensor_complete[:,k,:,:,k,:,:], view, T)
 		# @einsum slice[l,m,l,j,i] = view[m,l,j,i]
 		# trTensor_complete[:,k,:,:,k,:,:] = slice
 	end
 
 	# @einsum to_be_modified[l,k,j,i] := trTensor_complete[l,k,j,l,k,j,i]
-	to_be_modified = coexist.einsum("ijkljkl->ijkl", trTensor_complete, T)
-	to_be_modified .-= coexist.einsum("...jkl->...", trTensor_complete, T)
+	to_be_modified = Coexist.einsum("ijkljkl->ijkl", trTensor_complete, T)
+	to_be_modified .-= Coexist.einsum("...jkl->...", trTensor_complete, T)
 	# @einsum trTensor_complete[l,k,j,l,k,j,i] = view[l,k,j,i]
-	trTensor_complete = coexist._einsum11(trTensor_complete, to_be_modified, T)
+	trTensor_complete = Coexist._einsum11(trTensor_complete, to_be_modified, T)
 
 
-	dydt = coexist.einsum("ijkl,ijklmnp->imnp", stateTensor, trTensor_complete, T)
+	dydt = Coexist.einsum("ijkl,ijklmnp->imnp", stateTensor, trTensor_complete, T)
 	return vec(dydt)
 end
 

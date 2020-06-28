@@ -24,68 +24,6 @@ agePopulationTotal = 1000*[8044.056, 7642.473, 8558.707, 9295.024, 8604.251,
                                       9173.465, 7286.777, 5830.635, 3450.616]
 
 
-function build_paramDict(func)
-  global srcCode = ""
-  if srcCode == ""
-    open(@__FILE__) do file
-      global srcCode = read(file, String)
-    end
-  end
-  @assert func isa Function
-  fnRE = Regex(string("function\\s*",func))
-  reObj = match(fnRE, srcCode)
-  _defArgs = false
-  args="("
-  stack=1
-  pos = reObj.offset+length(reObj.match)+1
-  while pos < length(srcCode) && stack != 0
-      # println(repr())
-      if srcCode[pos] == '#' #skips the comment -- till end of line
-        while(srcCode[pos] != '\n')
-          pos+=1
-        end
-      end
-      if !isspace(srcCode[pos])
-          args = string(args, srcCode[pos])
-      end
-      if srcCode[pos] == '('
-          stack+=1
-      elseif srcCode[pos] == ')'
-          stack-=1
-      end
-      if (srcCode[pos] == '=')
-          _defArgs = true
-      end
-      pos+=1
-  end
-
-  dict = Dict()
-
-  if _defArgs
-      # println("default args")
-      # println(collect(split(args[2:end-1], r",|;")))
-      argList = collect(split(args[2:end-1], r",|;"))
-      dict = Dict()
-      for arg in argList
-          if occursin('=', arg)
-              lhs, rhs = split(arg, '=')
-              if occursin(':', lhs)
-                  lhs = SubString(lhs, 1, match(r":", lhs).offset-1)
-              end
-              # println(lhs, ' ', rhs)
-              argName = Meta.parse(lhs)
-              argVal = eval(Meta.parse(rhs))
-              # println(argName, ' ', argVal)
-              dict[argName] = argVal
-              if argVal isa Function
-                  dict[Meta.parse(string(lhs, "_params"))] = build_paramDict(argVal)
-              end
-          end
-      end
-  end
-  NamedTuple{Tuple(keys(dict))}(values(dict))
-end
-
 function _agePopulationRatio(agePopulationTotal)
     agePopulationTotal *= 55.98/66.27
     return agePopulationTotal/sum(agePopulationTotal)

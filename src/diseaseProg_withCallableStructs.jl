@@ -2,6 +2,8 @@
 using Parameters
 using Test
 
+abstract type CType end
+agePopulationRatio=0.5
 ## Existing Function
 function adjustRatesByAge_KeepAverageRateTest(rate; agePopulationRatio=agePopulationRatio,
                                                 ageRelativeAdjustment::Array=[],
@@ -33,7 +35,7 @@ end
 
 ## Callable struct
 
-@with_kw mutable struct adjustRatesByAge_KeepAverageRate
+@with_kw mutable struct adjustRatesByAge_KeepAverageRate <: CType
 	agePopulationRatio::Float64=agePopulationRatio
 	ageRelativeAdjustment::Array=[]
 	maxOutRate::Float64=10.0
@@ -76,3 +78,15 @@ end
 	@test adjustRatesByAge_KeepAverageRateTest(10; ageRelativeAdjustment=[1,2,3]) ==
 		adjustRatesByAge_KeepAverageRate()(10; ageRelativeAdjustment=[1,2,3])
 end
+
+istransparent(::Any) = false
+istransparent(::CType) = true
+
+params(m) = params(m, Val(istransparent(m)))
+params(m, ::Val{false}) = m
+function params(m, ::Val{true})
+    fields = fieldnames(typeof(m))
+    NamedTuple{fields}(Tuple([params(getfield(m, field)) for field in fields]))
+end
+
+println(params(adjustRatesByAge_KeepAverageRate()))

@@ -5,6 +5,17 @@
 # but modify it such that old people have less favorable outcomes (as observed)
 # But correspondingly I want people at lower risk to have more favorable outcome on average
 
+## Build NamedTuple for params
+istransparent(::Any) = false
+istransparent(::CType) = true
+
+build_paramDict(m) = build_paramDict(m, Val(istransparent(m)))
+build_paramDict(m, ::Val{false}) = m
+function build_paramDict(m, ::Val{true})
+    fields = fieldnames(typeof(m))
+    NamedTuple{fields}(Tuple([build_paramDict(getfield(m, field)) for field in fields]))
+end
+
 # For calculations see data_cleaning_py.ipynb, calculations from NHS England dataset as per 05 Apr
 relativeDeathRisk_given_COVID_by_age = [-0.99742186, -0.99728639, -0.98158438,
                                         -0.9830432 , -0.82983414, -0.84039294,

@@ -506,15 +506,15 @@ vs case isolation (policy = False, but with serious ageSocialMixingIsolation)
 """
 
 @with_kw mutable struct trFunc_newInfections_Complete <: CType
-  ageSocialMixingBaseline::Vector{Float64}=
+  ageSocialMixingBaseline::Array{Float64}=
     ageSocialMixingBaseline
-  ageSocialMixingDistancing::Vector{Float64}=
+  ageSocialMixingDistancing::Array{Float64}=
     ageSocialMixingDistancing
-  ageSocialMixingIsolation::Vector{Float64}=
+  ageSocialMixingIsolation::Array{Float64}=
     ageSocialMixingIsolation
   withinHospitalSocialMixing::Float64=
     withinHospitalSocialMixing
-  transmissionInfectionStage::Vector{Float64}=
+  transmissionInfectionStage::Array{Float64}=
     transmissionInfectionStage
 end
 
@@ -522,15 +522,15 @@ function (f::trFunc_newInfections_Complete)(
     stateTensor,
     policySocialDistancing::Bool, # True / False, no default because it's important to know which one we use at any moment!
     policyImmunityPassports::Bool, # True / False, no default because it's important to know which one we use at any moment!
-    ageSocialMixingBaseline::Vector{Float64}=
+    ageSocialMixingBaseline::Array{Float64}=
     ageSocialMixingBaseline,
-    ageSocialMixingDistancing::Vector{Float64}=
+    ageSocialMixingDistancing::Array{Float64}=
     ageSocialMixingDistancing,
-    ageSocialMixingIsolation::Vector{Float64}=
+    ageSocialMixingIsolation::Array{Float64}=
     ageSocialMixingIsolation,
     withinHospitalSocialMixing::Float64=
     withinHospitalSocialMixing,
-    transmissionInfectionStage::Vector{Float64}=
+    transmissionInfectionStage::Array{Float64}=
     transmissionInfectionStage;
     kwargs...
   )

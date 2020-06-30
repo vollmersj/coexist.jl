@@ -174,8 +174,8 @@ end
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 
 @with_kw mutable struct trFunc_diseaseProgression <: CType
-	ageRelativeRecoverySpeed::Array =ageRelativeRecoverySpeed
-	caseFatalityRatioHospital_given_COVID_by_age::Array=
+	ageRelativeRecoverySpeed::Vector{Float64} =ageRelativeRecoverySpeed
+	caseFatalityRatioHospital_given_COVID_by_age::Vector{Float64}=
 	 caseFatalityRatioHospital_given_COVID_by_age
 	nonsymptomatic_ratio::Float64 = 0.86
 	# number of days between measurable events
@@ -190,12 +190,13 @@ agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 	# Unknown rates to estimate
 	nonsymp_to_recovery::Float64 = 15.0
 	inverse_IS1_IS2::Float64 = 4.0
+	adjustRatesByAge_KeepAverageRate=adjustRatesByAge_KeepAverageRate()
 end
 
 function (f::trFunc_diseaseProgression)(
-    ageRelativeRecoverySpeed::Array =
+    ageRelativeRecoverySpeed::Vector{Float64} =
     ageRelativeRecoverySpeed,
-    caseFatalityRatioHospital_given_COVID_by_age::Array=
+    caseFatalityRatioHospital_given_COVID_by_age::Vector{Float64}=
     caseFatalityRatioHospital_given_COVID_by_age,
     nonsymptomatic_ratio::Float64 = 0.86,
     # number of days between measurable events
@@ -268,13 +269,13 @@ function (f::trFunc_diseaseProgression)(
 	# Modify all death and R1 rates:
 	for ii in range(1, stop = size(ageAdjusted_diseaseProgBaseline)[2])
 		# Adjust death rate by age dependent disease severity  ??? check the key args
-		ageAdjusted_diseaseProgBaseline[end, ii, :] = adjustRatesByAge_KeepAverageRate()(
+		ageAdjusted_diseaseProgBaseline[end, ii, :] = f.adjustRatesByAge_KeepAverageRate(
 					 ageAdjusted_diseaseProgBaseline[end, ii, 1],
 					 agePopulationRatio=_agePopulationRatio(agePopulationTotal),
 					 ageRelativeAdjustment=relativeDeathRisk_given_COVID_by_age
 					)
 		# Adjust recovery rate by age dependent recovery speed
-		ageAdjusted_diseaseProgBaseline[end - 2, ii, :] = adjustRatesByAge_KeepAverageRate()(
+		ageAdjusted_diseaseProgBaseline[end - 2, ii, :] = f.adjustRatesByAge_KeepAverageRate(
 					 ageAdjusted_diseaseProgBaseline[end - 2, ii, 1],
 					 agePopulationRatio=agePopulationRatio,
 					 ageRelativeAdjustment=ageRelativeRecoverySpeed
@@ -287,7 +288,7 @@ function (f::trFunc_diseaseProgression)(
 	ageAdjusted_diseaseProgBaseline_Hospital[end, 4, :] =
 	ageAdjusted_diseaseProgBaseline_Hospital[end - 2, 4, :] .* ( # IS2 -> recovery
 	caseFatalityRatioHospital_given_COVID_by_age./(  # multiply by cfr / (1-cfr) to get correct rate towards death
-																								 1 .-  caseFatalityRatioHospital_given_COVID_by_age) )
+			1 .-  caseFatalityRatioHospital_given_COVID_by_age) )
 
 	#TODO - time to death might be incorrect overall without an extra delay state, especially for young people
 	# Non-hospitalised disease progression
@@ -317,8 +318,8 @@ agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 end
 
 function (f::adjustRatesByAge_KeepAverageRate)(rate;
-    agePopulationRatio=agePopulationRatio,
-		ageRelativeAdjustment::Array=[],
+		agePopulationRatio=agePopulationRatio,
+		ageRelativeAdjustment::Vector{Float64}=Float64[],
 		maxOutRate::Float64=10.0
 	)
 	f.agePopulationRatio = agePopulationRatio
@@ -342,8 +343,8 @@ function (f::adjustRatesByAge_KeepAverageRate)(rate;
 						larger than $(f.maxOutRate) encountered, reducing ageAdjustment
 						variance by 10%")
 			tmp_mean = sum(f.ageRelativeAdjustment)/length(f.ageRelativeAdjustment)
-			f.ageRelativeAdjustment = tmp_mean .+ sqrt(0.9)*(
-																											 f.ageRelativeAdjustment .- tmp_mean)
+			f.ageRelativeAdjustment = tmp_mean .+
+                                sqrt(0.9)*(f.ageRelativeAdjustment .- tmp_mean)
 		end
 	end
 	return out
@@ -375,7 +376,7 @@ ageNhsClinicalStaffPopulationRatio = DataFrame(load(joinpath(DATA_DIR,
 # TODO - find / estimate data on this (unfortunately true rates are hard to get due to many unknown cases)
 # Symptom to hospitalisation is 5.76 days on average (Imperial #8)
 
-infToHospitalExtra = Array([1e-4, 1e-3, 2e-2, 1e-2])
+infToHospitalExtra = Vector{Float64}([1e-4, 1e-3, 2e-2, 1e-2])
 
 # For calculations see data_cleaning_py.ipynb, calculations from CHESS dataset as per 05 Apr
 relativeAdmissionRisk_given_COVID_by_age = [-0.94886625, -0.96332087, -0.86528671,
@@ -387,18 +388,18 @@ riskOfAEAttandance_by_age = [0.41261361, 0.31560648, 0.3843979 ,
                              0.24970244, 0.31549102, 0.65181376]
 
 @with_kw mutable struct trFunc_HospitalAdmission <: CType
-  ageHospitalisationRateBaseline::Array=
+  ageHospitalisationRateBaseline::Vector{Float64}=
   ageHospitalisationRateBaseline
-  infToHospitalExtra::Array=infToHospitalExtra
-  ageRelativeExtraAdmissionRiskToCovid::Array=
+  infToHospitalExtra::Vector{Float64}=infToHospitalExtra
+  ageRelativeExtraAdmissionRiskToCovid::Vector{Float64}=
     relativeAdmissionRisk_given_COVID_by_age.*riskOfAEAttandance_by_age
 end
 
 function (f::trFunc_HospitalAdmission)(
-    ageHospitalisationRateBaseline::Array=
+    ageHospitalisationRateBaseline::Vector{Float64}=
     ageHospitalisationRateBaseline,
-    infToHospitalExtra::Array=infToHospitalExtra,
-    ageRelativeExtraAdmissionRiskToCovid::Array=
+    infToHospitalExtra::Vector{Float64}=infToHospitalExtra,
+    ageRelativeExtraAdmissionRiskToCovid::Vector{Float64}=
     relativeAdmissionRisk_given_COVID_by_age .*
     riskOfAEAttandance_by_age;
     kwargs...
@@ -429,13 +430,13 @@ function (f::trFunc_HospitalAdmission)(
 end
 
 @with_kw mutable struct trFunc_HospitalDischarge <: CType
-  ageHospitalisationRecoveryRateBaseline::Array=
+  ageHospitalisationRecoveryRateBaseline::Vector{Float64}=
     ageHospitalisationRecoveryRateBaseline
   dischargeDueToCovidRateMultiplier::Float64=3.0
 end
 
 function (f::trFunc_HospitalDischarge)(
-    ageHospitalisationRecoveryRateBaseline::Array=
+    ageHospitalisationRecoveryRateBaseline::Vector{Float64}=
     ageHospitalisationRecoveryRateBaseline,
     dischargeDueToCovidRateMultiplier::Float64=3.0;
     kwargs...
@@ -505,15 +506,15 @@ vs case isolation (policy = False, but with serious ageSocialMixingIsolation)
 """
 
 @with_kw mutable struct trFunc_newInfections_Complete <: CType
-  ageSocialMixingBaseline::Array=
+  ageSocialMixingBaseline::Vector{Float64}=
     ageSocialMixingBaseline
-  ageSocialMixingDistancing::Array=
+  ageSocialMixingDistancing::Vector{Float64}=
     ageSocialMixingDistancing
-  ageSocialMixingIsolation::Array=
+  ageSocialMixingIsolation::Vector{Float64}=
     ageSocialMixingIsolation
   withinHospitalSocialMixing::Float64=
     withinHospitalSocialMixing
-  transmissionInfectionStage::Array=
+  transmissionInfectionStage::Vector{Float64}=
     transmissionInfectionStage
 end
 
@@ -521,15 +522,15 @@ function (f::trFunc_newInfections_Complete)(
     stateTensor,
     policySocialDistancing::Bool, # True / False, no default because it's important to know which one we use at any moment!
     policyImmunityPassports::Bool, # True / False, no default because it's important to know which one we use at any moment!
-    ageSocialMixingBaseline::Array=
+    ageSocialMixingBaseline::Vector{Float64}=
     ageSocialMixingBaseline,
-    ageSocialMixingDistancing::Array=
+    ageSocialMixingDistancing::Vector{Float64}=
     ageSocialMixingDistancing,
-    ageSocialMixingIsolation::Array=
+    ageSocialMixingIsolation::Vector{Float64}=
     ageSocialMixingIsolation,
     withinHospitalSocialMixing::Float64=
     withinHospitalSocialMixing,
-    transmissionInfectionStage::Array=
+    transmissionInfectionStage::Vector{Float64}=
     transmissionInfectionStage;
     kwargs...
   )
@@ -666,21 +667,21 @@ end
 # TODO - MANUAL! - this function is VERY specific to current health state setup, and needs to be manually edited if number of health states change
 
 @with_kw mutable struct inpFunc_testSpecifications <: CType
-  PCR_FNR_I1_to_R2::Array = [0.9,  0.4, 0.15, 0.35, 0.5, 0.8]
+  PCR_FNR_I1_to_R2::Vector{Float64} = [0.9,  0.4, 0.15, 0.35, 0.5, 0.8]
   PCR_FPR::Float64 = 0.01
-  antigen_FNR_I1_to_R2::Array = [0.95, 0.6, 0.35, 0.45, 0.6, 0.9]
+  antigen_FNR_I1_to_R2::Vector{Float64} = [0.95, 0.6, 0.35, 0.45, 0.6, 0.9]
   antigen_FPR::Float64 = 0.1
-  antibody_FNR_I1_to_R2::Array = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05]
-  antibody_FPR_S_to_I4::Array = [0.05, 0.04, 0.03, 0.02, 0.01]
+  antibody_FNR_I1_to_R2::Vector{Float64} = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05]
+  antibody_FPR_S_to_I4::Vector{Float64} = [0.05, 0.04, 0.03, 0.02, 0.01]
 end
 
 function (f::inpFunc_testSpecifications)(
-    PCR_FNR_I1_to_R2::Array = [0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
+    PCR_FNR_I1_to_R2::Vector{Float64} = [0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
     PCR_FPR::Float64 = 0.01,
-    antigen_FNR_I1_to_R2::Array = [0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
+    antigen_FNR_I1_to_R2::Vector{Float64} = [0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
     antigen_FPR::Float64 = 0.1,
-    antibody_FNR_I1_to_R2::Array = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05],
-    antibody_FPR_S_to_I4::Array = [0.05, 0.04, 0.03, 0.02, 0.01];
+    antibody_FNR_I1_to_R2::Vector{Float64} = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05],
+    antibody_FPR_S_to_I4::Vector{Float64} = [0.05, 0.04, 0.03, 0.02, 0.01];
     kwargs...
   )
   f.PCR_FNR_I1_to_R2=PCR_FNR_I1_to_R2

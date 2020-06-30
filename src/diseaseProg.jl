@@ -1,5 +1,6 @@
 # Library Imports
-
+using Parameters
+abstract type CType end
 #Based on England data (CHESS and NHS England)
 # I want a way to keep this as the "average" disease progression,
 # but modify it such that old people have less favorable outcomes (as observed)
@@ -162,100 +163,225 @@ end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 
-function trFunc_diseaseProgression(
-         ageRelativeRecoverySpeed::Array =
-         ageRelativeRecoverySpeed,
-         caseFatalityRatioHospital_given_COVID_by_age::Array=
-         caseFatalityRatioHospital_given_COVID_by_age,
-         nonsymptomatic_ratio::Float64 = 0.86,
-                                   # number of days between measurable events
-         infect_to_symptoms::Float64 = 5.0,
-                                   #symptom_to_death = 16.;
-         symptom_to_recovery::Float64= 10.0, # 20.5; #unrealiticly long for old people
-         symptom_to_hospitalisation::Float64 = 5.76,
-         hospitalisation_to_recovery::Float64 = 14.51,
-         IgG_formation::Float64 = 15.0,
-                                   # Age related parameters
-                                   # for now we'll assume that all hospitalised cases are known (overall 23% of hospitalised COVID patients die. 9% overall case fatality ratio)
-                                   # Unknown rates to estimate
-         nonsymp_to_recovery::Float64 = 15.0,
-         inverse_IS1_IS2::Float64 = 4.0;
-         kwargs...)
-    # Now we have all the information to build the age-aware multistage SIR model transition matrix
-    # The full transition tensor is a sparse map from the Age x HealthState x isolation state to HealthState,
-    # and thus is a 4th order tensor itself, representing a linear mapping
-    # from "number of people aged A in health state B and isolation state C to health state D.
-    #agePopulationRatioByTotal = _agePopulationRatio(agePopulationTotal)
-    nAge, nHS, nIso = kwargs[:nAge], kwargs[:nHS], kwargs[:nIso]
-    #relativeDeathRisk_given_COVID_by_age = [:relativeDeathRisk_given_COVID_by_age]
-    trTensor_diseaseProgression = zeros((nHS, nIso, nHS, nAge))
-    # Use basic parameters to regularise inputs
-    E_IS1 = 1.0/infect_to_symptoms
-    # Numbers nonsymptomatic is assumed to be 86% -> E->IN / E-IS1 = 0.86/0.14
-    E_IN = 0.86/0.14 * E_IS1
-    # Nonsymptomatic recovery
-    IN_R1 = 1.0/nonsymp_to_recovery
-    IS1_IS2  = 1.0/inverse_IS1_IS2
-    IS2_R1 = 1.0/(symptom_to_recovery - inverse_IS1_IS2)
-    R1_R2 = 1.0/IgG_formation
+# function trFunc_diseaseProgression(
+#          ageRelativeRecoverySpeed::Array =
+#          ageRelativeRecoverySpeed,
+#          caseFatalityRatioHospital_given_COVID_by_age::Array=
+#          caseFatalityRatioHospital_given_COVID_by_age,
+#          nonsymptomatic_ratio::Float64 = 0.86,
+#                                    # number of days between measurable events
+#          infect_to_symptoms::Float64 = 5.0,
+#                                    #symptom_to_death = 16.;
+#          symptom_to_recovery::Float64= 10.0, # 20.5; #unrealiticly long for old people
+#          symptom_to_hospitalisation::Float64 = 5.76,
+#          hospitalisation_to_recovery::Float64 = 14.51,
+#          IgG_formation::Float64 = 15.0,
+#                                    # Age related parameters
+#                                    # for now we'll assume that all hospitalised cases are known (overall 23% of hospitalised COVID patients die. 9% overall case fatality ratio)
+#                                    # Unknown rates to estimate
+#          nonsymp_to_recovery::Float64 = 15.0,
+#          inverse_IS1_IS2::Float64 = 4.0;
+#          kwargs...)
+#     # Now we have all the information to build the age-aware multistage SIR model transition matrix
+#     # The full transition tensor is a sparse map from the Age x HealthState x isolation state to HealthState,
+#     # and thus is a 4th order tensor itself, representing a linear mapping
+#     # from "number of people aged A in health state B and isolation state C to health state D.
+#     #agePopulationRatioByTotal = _agePopulationRatio(agePopulationTotal)
+#     nAge, nHS, nIso = kwargs[:nAge], kwargs[:nHS], kwargs[:nIso]
+#     #relativeDeathRisk_given_COVID_by_age = [:relativeDeathRisk_given_COVID_by_age]
+#     trTensor_diseaseProgression = zeros((nHS, nIso, nHS, nAge))
+#     # Use basic parameters to regularise inputs
+#     E_IS1 = 1.0/infect_to_symptoms
+#     # Numbers nonsymptomatic is assumed to be 86% -> E->IN / E-IS1 = 0.86/0.14
+#     E_IN = 0.86/0.14 * E_IS1
+#     # Nonsymptomatic recovery
+#     IN_R1 = 1.0/nonsymp_to_recovery
+#     IS1_IS2  = 1.0/inverse_IS1_IS2
+#     IS2_R1 = 1.0/(symptom_to_recovery - inverse_IS1_IS2)
+#     R1_R2 = 1.0/IgG_formation
+#
+#     # Disease progression matrix # TODO - calibrate (together with transmissionInfectionStage)
+#     # rows: from-state, cols: to-state (non-symmetric!)
+#     # - this represent excess deaths only, doesn't contain baseline deaths!
+#
+#     # Calculate all non-serious cases that do not end up in hospitals.
+#     # Note that we only have reliable death data from hospitals (NHS England),
+#     # so we do not model people dieing outside hospitals
+#     diseaseProgBaseline = [
+#     # to: E,    IN,    IS1,   IS2,    R1,      R2,     D
+#           0.0  E_IN  E_IS1    0       0        0       0    # from E
+#           0    0      0       0     IN_R1      0       0    # from IN
+#           0    0      0    IS1_IS2    0        0       0    # from IS1
+#           0    0      0       0     IS2_R1     0       0    # from IS2
+#           0    0      0       0       0       R1_R2    0    # from R1
+#           0    0      0       0       0        0       0    # from R2
+#           0    0      0       0       0        0       0    # from D
+#     ]
+#
+#     diseaseProgBaseline = transpose(diseaseProgBaseline)
+#     # TODO can be improved
+#     # vcat(fill.(x, v)...) ???
+#     ageAdjusted_diseaseProgBaseline = deepcopy(cat(repeat([diseaseProgBaseline],
+#                                                               nAge)..., dims=3))
+#     # Modify all death and R1 rates:
+#     for ii in range(1, stop = size(ageAdjusted_diseaseProgBaseline)[2])
+#         # Adjust death rate by age dependent disease severity  ??? check the key args
+#         ageAdjusted_diseaseProgBaseline[end, ii, :] = adjustRatesByAge_KeepAverageRate(
+#                                             ageAdjusted_diseaseProgBaseline[end, ii, 1],
+#                              agePopulationRatio=_agePopulationRatio(agePopulationTotal),
+#                               ageRelativeAdjustment=relativeDeathRisk_given_COVID_by_age
+#                               )
+#         # Adjust recovery rate by age dependent recovery speed
+#         ageAdjusted_diseaseProgBaseline[end - 2, ii, :] = adjustRatesByAge_KeepAverageRate(
+#                                             ageAdjusted_diseaseProgBaseline[end - 2, ii, 1],
+#                                                       agePopulationRatio=agePopulationRatio,
+#                                              ageRelativeAdjustment=ageRelativeRecoverySpeed
+#                                              )
+#     end
+#     ageAdjusted_diseaseProgBaseline_Hospital = deepcopy(ageAdjusted_diseaseProgBaseline)
+#     # Calculate hospitalisation based rates, for which we do have data. Hospitalisation can end up with deaths
+#     # Make sure that the ratio of recoveries in hospital honour the case fatality ratio appropriately
+#     # IS2 -> death
+#     ageAdjusted_diseaseProgBaseline_Hospital[end, 4, :] =
+#                      ageAdjusted_diseaseProgBaseline_Hospital[end - 2, 4, :] .* ( # IS2 -> recovery
+#                                   caseFatalityRatioHospital_given_COVID_by_age./(  # multiply by cfr / (1-cfr) to get correct rate towards death
+#                             1 .-  caseFatalityRatioHospital_given_COVID_by_age) )
+#
+#     #TODO - time to death might be incorrect overall without an extra delay state, especially for young people
+#     # Non-hospitalised disease progression
+#     for i1 in [1, 2, 4]
+#         trTensor_diseaseProgression[2:end, i1, 2:end, :] = ageAdjusted_diseaseProgBaseline
+#     end
+#     # hospitalised disease progression
+#     trTensor_diseaseProgression[2:end, 3, 2:end, :] = ageAdjusted_diseaseProgBaseline_Hospital
+#     return trTensor_diseaseProgression
+# end
 
-    # Disease progression matrix # TODO - calibrate (together with transmissionInfectionStage)
-    # rows: from-state, cols: to-state (non-symmetric!)
-    # - this represent excess deaths only, doesn't contain baseline deaths!
-
-    # Calculate all non-serious cases that do not end up in hospitals.
-    # Note that we only have reliable death data from hospitals (NHS England),
-    # so we do not model people dieing outside hospitals
-    diseaseProgBaseline = [
-    # to: E,    IN,    IS1,   IS2,    R1,      R2,     D
-          0.0  E_IN  E_IS1    0       0        0       0    # from E
-          0    0      0       0     IN_R1      0       0    # from IN
-          0    0      0    IS1_IS2    0        0       0    # from IS1
-          0    0      0       0     IS2_R1     0       0    # from IS2
-          0    0      0       0       0       R1_R2    0    # from R1
-          0    0      0       0       0        0       0    # from R2
-          0    0      0       0       0        0       0    # from D
-    ]
-
-    diseaseProgBaseline = transpose(diseaseProgBaseline)
-    # TODO can be improved
-    # vcat(fill.(x, v)...) ???
-    ageAdjusted_diseaseProgBaseline = deepcopy(cat(repeat([diseaseProgBaseline],
-                                                              nAge)..., dims=3))
-    # Modify all death and R1 rates:
-    for ii in range(1, stop = size(ageAdjusted_diseaseProgBaseline)[2])
-        # Adjust death rate by age dependent disease severity  ??? check the key args
-        ageAdjusted_diseaseProgBaseline[end, ii, :] = adjustRatesByAge_KeepAverageRate(
-                                            ageAdjusted_diseaseProgBaseline[end, ii, 1],
-                             agePopulationRatio=_agePopulationRatio(agePopulationTotal),
-                              ageRelativeAdjustment=relativeDeathRisk_given_COVID_by_age
-                              )
-        # Adjust recovery rate by age dependent recovery speed
-        ageAdjusted_diseaseProgBaseline[end - 2, ii, :] = adjustRatesByAge_KeepAverageRate(
-                                            ageAdjusted_diseaseProgBaseline[end - 2, ii, 1],
-                                                      agePopulationRatio=agePopulationRatio,
-                                             ageRelativeAdjustment=ageRelativeRecoverySpeed
-                                             )
-    end
-    ageAdjusted_diseaseProgBaseline_Hospital = deepcopy(ageAdjusted_diseaseProgBaseline)
-    # Calculate hospitalisation based rates, for which we do have data. Hospitalisation can end up with deaths
-    # Make sure that the ratio of recoveries in hospital honour the case fatality ratio appropriately
-    # IS2 -> death
-    ageAdjusted_diseaseProgBaseline_Hospital[end, 4, :] =
-                     ageAdjusted_diseaseProgBaseline_Hospital[end - 2, 4, :] .* ( # IS2 -> recovery
-                                  caseFatalityRatioHospital_given_COVID_by_age./(  # multiply by cfr / (1-cfr) to get correct rate towards death
-                            1 .-  caseFatalityRatioHospital_given_COVID_by_age) )
-
-    #TODO - time to death might be incorrect overall without an extra delay state, especially for young people
-    # Non-hospitalised disease progression
-    for i1 in [1, 2, 4]
-        trTensor_diseaseProgression[2:end, i1, 2:end, :] = ageAdjusted_diseaseProgBaseline
-    end
-    # hospitalised disease progression
-    trTensor_diseaseProgression[2:end, 3, 2:end, :] = ageAdjusted_diseaseProgBaseline_Hospital
-    return trTensor_diseaseProgression
+@with_kw mutable struct trFunc_diseaseProgression
+	ageRelativeRecoverySpeed::Array =ageRelativeRecoverySpeed
+	caseFatalityRatioHospital_given_COVID_by_age::Array=
+	 caseFatalityRatioHospital_given_COVID_by_age
+	nonsymptomatic_ratio::Float64 = 0.86
+	# number of days between measurable events
+	infect_to_symptoms::Float64 = 5.0
+	#symptom_to_death = 16.;
+	symptom_to_recovery::Float64= 10.0 # 20.5; #unrealiticly long for old people
+	symptom_to_hospitalisation::Float64 = 5.76
+	hospitalisation_to_recovery::Float64 = 14.51
+	IgG_formation::Float64 = 15.0
+	# Age related parameters
+	# for now we'll assume that all hospitalised cases are known (overall 23% of hospitalised COVID patients die. 9% overall case fatality ratio)
+	# Unknown rates to estimate
+	nonsymp_to_recovery::Float64 = 15.0
+	inverse_IS1_IS2::Float64 = 4.0
 end
 
+function (f::trFunc_diseaseProgression)(
+    ageRelativeRecoverySpeed::Array =
+    ageRelativeRecoverySpeed,
+    caseFatalityRatioHospital_given_COVID_by_age::Array=
+    caseFatalityRatioHospital_given_COVID_by_age,
+    nonsymptomatic_ratio::Float64 = 0.86,
+    # number of days between measurable events
+    infect_to_symptoms::Float64 = 5.0,
+    #symptom_to_death = 16.;
+    symptom_to_recovery::Float64= 10.0, # 20.5; #unrealiticly long for old people
+    symptom_to_hospitalisation::Float64 = 5.76,
+    hospitalisation_to_recovery::Float64 = 14.51,
+    IgG_formation::Float64 = 15.0,
+    # Age related parameters
+    # for now we'll assume that all hospitalised cases are known (overall 23% of hospitalised COVID patients die. 9% overall case fatality ratio)
+    # Unknown rates to estimate
+    nonsymp_to_recovery::Float64 = 15.0,
+    inverse_IS1_IS2::Float64 = 4.0;
+    kwargs...
+  )
+
+  f.ageRelativeRecoverySpeed=ageRelativeRecoverySpeed
+  f.caseFatalityRatioHospital_given_COVID_by_age=caseFatalityRatioHospital_given_COVID_by_age
+  f.nonsymptomatic_ratio=nonsymptomatic_ratio
+  f.infect_to_symptoms=infect_to_symptoms
+  f.symptom_to_recovery=symptom_to_recovery
+  f.symptom_to_hospitalisation=symptom_to_hospitalisation
+  f.hospitalisation_to_recovery=hospitalisation_to_recovery
+  f.IgG_formation=IgG_formation
+  f.nonsymp_to_recovery=nonsymp_to_recovery
+  f.inverse_IS1_IS2=inverse_IS1_IS2
+
+  # Now we have all the information to build the age-aware multistage SIR model transition matrix
+	# The full transition tensor is a sparse map from the Age x HealthState x isolation state to HealthState,
+	# and thus is a 4th order tensor itself, representing a linear mapping
+	# from "number of people aged A in health state B and isolation state C to health state D.
+	#agePopulationRatioByTotal = _agePopulationRatio(agePopulationTotal)
+	nAge, nHS, nIso = kwargs[:nAge], kwargs[:nHS], kwargs[:nIso]
+	#relativeDeathRisk_given_COVID_by_age = [:relativeDeathRisk_given_COVID_by_age]
+	trTensor_diseaseProgression = zeros((nHS, nIso, nHS, nAge))
+	# Use basic parameters to regularise inputs
+	E_IS1 = 1.0/infect_to_symptoms
+	# Numbers nonsymptomatic is assumed to be 86% -> E->IN / E-IS1 = 0.86/0.14
+	E_IN = 0.86/0.14 * E_IS1
+	# Nonsymptomatic recovery
+	IN_R1 = 1.0/nonsymp_to_recovery
+	IS1_IS2  = 1.0/inverse_IS1_IS2
+	IS2_R1 = 1.0/(symptom_to_recovery - inverse_IS1_IS2)
+	R1_R2 = 1.0/IgG_formation
+
+	# Disease progression matrix # TODO - calibrate (together with transmissionInfectionStage)
+	# rows: from-state, cols: to-state (non-symmetric!)
+	# - this represent excess deaths only, doesn't contain baseline deaths!
+
+	# Calculate all non-serious cases that do not end up in hospitals.
+	# Note that we only have reliable death data from hospitals (NHS England),
+	# so we do not model people dieing outside hospitals
+	diseaseProgBaseline = [
+							 # to: E,    IN,    IS1,   IS2,    R1,      R2,     D
+							 0.0  E_IN  E_IS1    0       0        0       0    # from E
+							 0    0      0       0     IN_R1      0       0    # from IN
+							 0    0      0    IS1_IS2    0        0       0    # from IS1
+							 0    0      0       0     IS2_R1     0       0    # from IS2
+							 0    0      0       0       0       R1_R2    0    # from R1
+							 0    0      0       0       0        0       0    # from R2
+							 0    0      0       0       0        0       0    # from D
+							]
+
+	diseaseProgBaseline = transpose(diseaseProgBaseline)
+	# TODO can be improved
+	# vcat(fill.(x, v)...) ???
+	ageAdjusted_diseaseProgBaseline = deepcopy(cat(repeat([diseaseProgBaseline],
+															nAge)..., dims=3))
+	# Modify all death and R1 rates:
+	for ii in range(1, stop = size(ageAdjusted_diseaseProgBaseline)[2])
+		# Adjust death rate by age dependent disease severity  ??? check the key args
+		ageAdjusted_diseaseProgBaseline[end, ii, :] = adjustRatesByAge_KeepAverageRate()(
+					 ageAdjusted_diseaseProgBaseline[end, ii, 1],
+					 agePopulationRatio=_agePopulationRatio(agePopulationTotal),
+					 ageRelativeAdjustment=relativeDeathRisk_given_COVID_by_age
+					)
+		# Adjust recovery rate by age dependent recovery speed
+		ageAdjusted_diseaseProgBaseline[end - 2, ii, :] = adjustRatesByAge_KeepAverageRate()(
+					 ageAdjusted_diseaseProgBaseline[end - 2, ii, 1],
+					 agePopulationRatio=agePopulationRatio,
+					 ageRelativeAdjustment=ageRelativeRecoverySpeed
+					)
+	end
+	ageAdjusted_diseaseProgBaseline_Hospital = deepcopy(ageAdjusted_diseaseProgBaseline)
+	# Calculate hospitalisation based rates, for which we do have data. Hospitalisation can end up with deaths
+	# Make sure that the ratio of recoveries in hospital honour the case fatality ratio appropriately
+	# IS2 -> death
+	ageAdjusted_diseaseProgBaseline_Hospital[end, 4, :] =
+	ageAdjusted_diseaseProgBaseline_Hospital[end - 2, 4, :] .* ( # IS2 -> recovery
+	caseFatalityRatioHospital_given_COVID_by_age./(  # multiply by cfr / (1-cfr) to get correct rate towards death
+																								 1 .-  caseFatalityRatioHospital_given_COVID_by_age) )
+
+	#TODO - time to death might be incorrect overall without an extra delay state, especially for young people
+	# Non-hospitalised disease progression
+	for i1 in [1, 2, 4]
+		trTensor_diseaseProgression[2:end, i1, 2:end, :] = ageAdjusted_diseaseProgBaseline
+	end
+	# hospitalised disease progression
+	trTensor_diseaseProgression[2:end, 3, 2:end, :] = ageAdjusted_diseaseProgBaseline_Hospital
+	return trTensor_diseaseProgression
+end
 
 # Population (data from Imperial #13 ages.csv/UK)
 #agePopulationTotal = 1000*[8044.056, 7642.473, 8558.707, 9295.024, 8604.251,
@@ -268,32 +394,71 @@ end
 
 agePopulationRatio = _agePopulationRatio(agePopulationTotal)
 
-function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=agePopulationRatio,
-                                                ageRelativeAdjustment::Array=nothing,
-                                                maxOutRate::Float64=10.0)
-    if rate == 0
-        return fill(0, size(ageRelativeAdjustment))
-    end
-    if rate >= maxOutRate
-        @warn("covidTesting::adjustRatesByAge_KeepAverageRate Input rate $rate >
-                     maxOutRate $maxOutRate, returning input rates")
-        return rate*(fill(1, size(ageRelativeAdjustment)))
-    end
-    out = fill(0, size(ageRelativeAdjustment))
-    out[1] = maxOutRate + 1
-    while sum(out .>= maxOutRate) > 0
-        corrFactor = sum(agePopulationRatio ./ (1 .+ ageRelativeAdjustment))
-        out =  rate * (1 .+ ageRelativeAdjustment) * corrFactor
-        if sum(out .>= maxOutRate) > 0
-            @warn("covidTesting::adjustRatesByAge_KeepAverageRate Adjusted rate
-                   larger than $maxOutRate encountered, reducing ageAdjustment
-                   variance by 10%")
-            tmp_mean = sum(ageRelativeAdjustment)/length(ageRelativeAdjustment)
-            ageRelativeAdjustment = tmp_mean .+ sqrt(0.9)*(
-                                            ageRelativeAdjustment .- tmp_mean)
-        end
-    end
-    return out
+# function adjustRatesByAge_KeepAverageRate(rate; agePopulationRatio=agePopulationRatio,
+#                                                 ageRelativeAdjustment::Array=nothing,
+#                                                 maxOutRate::Float64=10.0)
+#     if rate == 0
+#         return fill(0, size(ageRelativeAdjustment))
+#     end
+#     if rate >= maxOutRate
+#         @warn("covidTesting::adjustRatesByAge_KeepAverageRate Input rate $rate >
+#                      maxOutRate $maxOutRate, returning input rates")
+#         return rate*(fill(1, size(ageRelativeAdjustment)))
+#     end
+#     out = fill(0, size(ageRelativeAdjustment))
+#     out[1] = maxOutRate + 1
+#     while sum(out .>= maxOutRate) > 0
+#         corrFactor = sum(agePopulationRatio ./ (1 .+ ageRelativeAdjustment))
+#         out =  rate * (1 .+ ageRelativeAdjustment) * corrFactor
+#         if sum(out .>= maxOutRate) > 0
+#             @warn("covidTesting::adjustRatesByAge_KeepAverageRate Adjusted rate
+#                    larger than $maxOutRate encountered, reducing ageAdjustment
+#                    variance by 10%")
+#             tmp_mean = sum(ageRelativeAdjustment)/length(ageRelativeAdjustment)
+#             ageRelativeAdjustment = tmp_mean .+ sqrt(0.9)*(
+#                                             ageRelativeAdjustment .- tmp_mean)
+#         end
+#     end
+#     return out
+# end
+
+@with_kw mutable struct adjustRatesByAge_KeepAverageRate <: CType
+	agePopulationRatio=agePopulationRatio
+	ageRelativeAdjustment::Vector{Float64}=Float64[]
+	maxOutRate::Float64=10.0
+end
+
+function (f::adjustRatesByAge_KeepAverageRate)(rate;
+    agePopulationRatio=agePopulationRatio,
+		ageRelativeAdjustment::Array=[],
+		maxOutRate::Float64=10.0
+	)
+	f.agePopulationRatio = agePopulationRatio
+	f.ageRelativeAdjustment = ageRelativeAdjustment
+	f.maxOutRate = maxOutRate
+	if rate == 0
+		return fill(0, size(f.ageRelativeAdjustment))
+	end
+	if rate >= f.maxOutRate
+		@warn("covidTesting::adjustRatesByAge_KeepAverageRate Input rate $rate >
+					maxOutRate $(f.maxOutRate), returning input rates")
+		return rate*(fill(1, size(f.ageRelativeAdjustment)))
+	end
+	out = fill(0, size(f.ageRelativeAdjustment))
+	out[1] = f.maxOutRate + 1
+	while sum(out .>= f.maxOutRate) > 0
+		corrFactor = sum(f.agePopulationRatio ./ (1 .+ f.ageRelativeAdjustment))
+		out =  rate * (1 .+ f.ageRelativeAdjustment) * corrFactor
+		if sum(out .>= f.maxOutRate) > 0
+			@warn("covidTesting::adjustRatesByAge_KeepAverageRate Adjusted rate
+						larger than $(f.maxOutRate) encountered, reducing ageAdjustment
+						variance by 10%")
+			tmp_mean = sum(f.ageRelativeAdjustment)/length(f.ageRelativeAdjustment)
+			f.ageRelativeAdjustment = tmp_mean .+ sqrt(0.9)*(
+																											 f.ageRelativeAdjustment .- tmp_mean)
+		end
+	end
+	return out
 end
 
 # Getting Hospitalised
@@ -333,43 +498,114 @@ riskOfAEAttandance_by_age = [0.41261361, 0.31560648, 0.3843979 ,
                              0.30475704, 0.26659415,0.25203475,
                              0.24970244, 0.31549102, 0.65181376]
 
-function trFunc_HospitalAdmission(
-         ageHospitalisationRateBaseline::Array=
-         ageHospitalisationRateBaseline,
-         infToHospitalExtra::Array=infToHospitalExtra,
-         ageRelativeExtraAdmissionRiskToCovid::Array=
-         relativeAdmissionRisk_given_COVID_by_age .*
-         riskOfAEAttandance_by_age;
-         kwargs...
-         )
-    nAge, nHS, nI = kwargs[:nAge], kwargs[:nHS], kwargs[:nI]
+# function trFunc_HospitalAdmission(
+#          ageHospitalisationRateBaseline::Array=
+#          ageHospitalisationRateBaseline,
+#          infToHospitalExtra::Array=infToHospitalExtra,
+#          ageRelativeExtraAdmissionRiskToCovid::Array=
+#          relativeAdmissionRisk_given_COVID_by_age .*
+#          riskOfAEAttandance_by_age;
+#          kwargs...
+#          )
+#     nAge, nHS, nI = kwargs[:nAge], kwargs[:nHS], kwargs[:nI]
+#
+#     trTensor_HospitalAdmission = zeros((nHS, nAge))
+#
+#     ageAdjusted_infToHospitalExtra = deepcopy(cat(repeat([infToHospitalExtra],
+#                                                              nAge)..., dims=2))
+#     for ii in range(1, stop = size(ageAdjusted_infToHospitalExtra)[1])
+#         ageAdjusted_infToHospitalExtra[ii, :] = adjustRatesByAge_KeepAverageRate(
+#                      infToHospitalExtra[ii],
+#                      ageRelativeAdjustment=ageRelativeExtraAdmissionRiskToCovid
+#                     )
+#     end
+#     # Add baseline hospitalisation to all non-dead states
+#     trTensor_HospitalAdmission[1:end-1, :] .+= reshape(ageHospitalisationRateBaseline,
+#                                             (1, size(ageHospitalisationRateBaseline)...))
+#     # Add COVID-caused hospitalisation to all infeted states
+#     #(TODO: This is a summation fo rates for independent processes, should be correct, but check)
+#     trTensor_HospitalAdmission[2:(nI+1), :] .+= ageAdjusted_infToHospitalExtra
+#     return trTensor_HospitalAdmission
+# end
 
-    trTensor_HospitalAdmission = zeros((nHS, nAge))
-
-    ageAdjusted_infToHospitalExtra = deepcopy(cat(repeat([infToHospitalExtra],
-                                                             nAge)..., dims=2))
-    for ii in range(1, stop = size(ageAdjusted_infToHospitalExtra)[1])
-        ageAdjusted_infToHospitalExtra[ii, :] = adjustRatesByAge_KeepAverageRate(
-                     infToHospitalExtra[ii],
-                     ageRelativeAdjustment=ageRelativeExtraAdmissionRiskToCovid
-                    )
-    end
-    # Add baseline hospitalisation to all non-dead states
-    trTensor_HospitalAdmission[1:end-1, :] .+= reshape(ageHospitalisationRateBaseline,
-                                            (1, size(ageHospitalisationRateBaseline)...))
-    # Add COVID-caused hospitalisation to all infeted states
-    #(TODO: This is a summation fo rates for independent processes, should be correct, but check)
-    trTensor_HospitalAdmission[2:(nI+1), :] .+= ageAdjusted_infToHospitalExtra
-    return trTensor_HospitalAdmission
+@with_kw mutable struct trFunc_HospitalAdmission
+  ageHospitalisationRateBaseline::Array=
+  ageHospitalisationRateBaseline
+  infToHospitalExtra::Array=infToHospitalExtra
+  ageRelativeExtraAdmissionRiskToCovid::Array=
+    relativeAdmissionRisk_given_COVID_by_age.*riskOfAEAttandance_by_age
 end
 
+function (f::trFunc_HospitalAdmission)(
+    ageHospitalisationRateBaseline::Array=
+    ageHospitalisationRateBaseline,
+    infToHospitalExtra::Array=infToHospitalExtra,
+    ageRelativeExtraAdmissionRiskToCovid::Array=
+    relativeAdmissionRisk_given_COVID_by_age .*
+    riskOfAEAttandance_by_age;
+    kwargs...
+  )
+  f.ageHospitalisationRateBaseline=ageHospitalisationRateBaseline
+  f.infToHospitalExtra=infToHospitalExtra
+  f.ageRelativeExtraAdmissionRiskToCovid=ageRelativeExtraAdmissionRiskToCovid
+  nAge, nHS, nI = kwargs[:nAge], kwargs[:nHS], kwargs[:nI]
 
-function trFunc_HospitalDischarge(
+
+  trTensor_HospitalAdmission = zeros((nHS, nAge))
+
+  ageAdjusted_infToHospitalExtra = deepcopy(cat(repeat([infToHospitalExtra],
+                                                           nAge)..., dims=2))
+  for ii in range(1, stop = size(ageAdjusted_infToHospitalExtra)[1])
+      ageAdjusted_infToHospitalExtra[ii, :] = adjustRatesByAge_KeepAverageRate()(
+                   infToHospitalExtra[ii],
+                   ageRelativeAdjustment=ageRelativeExtraAdmissionRiskToCovid
+                  )
+  end
+  # Add baseline hospitalisation to all non-dead states
+  trTensor_HospitalAdmission[1:end-1, :] .+= reshape(ageHospitalisationRateBaseline,
+                                          (1, size(ageHospitalisationRateBaseline)...))
+  # Add COVID-caused hospitalisation to all infeted states
+  #(TODO: This is a summation fo rates for independent processes, should be correct, but check)
+  trTensor_HospitalAdmission[2:(nI+1), :] .+= ageAdjusted_infToHospitalExtra
+  return trTensor_HospitalAdmission
+end
+
+# function trFunc_HospitalDischarge(
+#     ageHospitalisationRecoveryRateBaseline::Array=
+#     ageHospitalisationRecoveryRateBaseline,
+#     dischargeDueToCovidRateMultiplier::Float64=3.0;
+#     kwargs...
+#     )
+#     nAge, nHS = kwargs[:nAge], kwargs[:nHS]
+#     trTensor_HospitalDischarge = zeros((nHS, nAge))
+#     # Baseline discharges apply to all non-symptomatic patients (TODO: take into account testing state!)
+#     trTensor_HospitalDischarge[1:3, :] .+= transpose(
+#                                      ageHospitalisationRecoveryRateBaseline)
+#
+#     # No discharges for COVID symptomatic people from the hospital until they recover
+#     # TODO - check with health experts if this is correct assumption; probably also depends on testing state
+#     trTensor_HospitalDischarge[4:5, :] .= 0.0
+#     trTensor_HospitalDischarge[6:7, :] .= dischargeDueToCovidRateMultiplier .*
+#                             transpose(ageHospitalisationRecoveryRateBaseline)
+#     return trTensor_HospitalDischarge
+# end
+
+@with_kw mutable struct trFunc_HospitalDischarge
+  ageHospitalisationRecoveryRateBaseline::Array=
+    ageHospitalisationRecoveryRateBaseline
+  dischargeDueToCovidRateMultiplier::Float64=3.0
+end
+
+function (f::trFunc_HospitalDischarge)(
     ageHospitalisationRecoveryRateBaseline::Array=
     ageHospitalisationRecoveryRateBaseline,
     dischargeDueToCovidRateMultiplier::Float64=3.0;
     kwargs...
     )
+    f.ageHospitalisationRecoveryRateBaseline=
+      ageHospitalisationRecoveryRateBaseline
+    f.dischargeDueToCovidRateMultiplier=
+      dischargeDueToCovidRateMultiplier
     nAge, nHS = kwargs[:nAge], kwargs[:nHS]
     trTensor_HospitalDischarge = zeros((nHS, nAge))
     # Baseline discharges apply to all non-symptomatic patients (TODO: take into account testing state!)
@@ -383,7 +619,6 @@ function trFunc_HospitalDischarge(
                             transpose(ageHospitalisationRecoveryRateBaseline)
     return trTensor_HospitalDischarge
 end
-
 
 # Overall new infections include within quarantine and hospital infections
 # ------------------------------------------------------------------------
@@ -429,120 +664,272 @@ This separation will help disentangle the effects of simply a blanket lessening 
 (keeping the policy True but with less effective ageSocialMixingDistancing matrix),
 vs case isolation (policy = False, but with serious ageSocialMixingIsolation)
 """
-function trFunc_newInfections_Complete(
-         stateTensor,
-         policySocialDistancing::Bool, # True / False, no default because it's important to know which one we use at any moment!
-         policyImmunityPassports::Bool, # True / False, no default because it's important to know which one we use at any moment!
-         ageSocialMixingBaseline::Array=
-         ageSocialMixingBaseline,
-         ageSocialMixingDistancing::Array=
-         ageSocialMixingDistancing,
-         ageSocialMixingIsolation::Array=
-         ageSocialMixingIsolation,
-         withinHospitalSocialMixing::Float64=
-         withinHospitalSocialMixing,
-         transmissionInfectionStage::Array=
-         transmissionInfectionStage;
-         kwargs...
-         )
+# function trFunc_newInfections_Complete(
+#          stateTensor,
+#          policySocialDistancing::Bool, # True / False, no default because it's important to know which one we use at any moment!
+#          policyImmunityPassports::Bool, # True / False, no default because it's important to know which one we use at any moment!
+#          ageSocialMixingBaseline::Array=
+#          ageSocialMixingBaseline,
+#          ageSocialMixingDistancing::Array=
+#          ageSocialMixingDistancing,
+#          ageSocialMixingIsolation::Array=
+#          ageSocialMixingIsolation,
+#          withinHospitalSocialMixing::Float64=
+#          withinHospitalSocialMixing,
+#          transmissionInfectionStage::Array=
+#          transmissionInfectionStage;
+#          kwargs...
+#          )
+#
+#     nTest, nIso, nHS, nAge, nI = kwargs[:nTest], kwargs[:nIso], kwargs[:nHS],
+#                                  kwargs[:nAge] , kwargs[:nI]
+#     ageIsoContractionRate = zeros((nTest, nIso, nAge))
+#     # Add non-hospital infections
+#     #--------------------------------
+#     curNonIsolatedSocialMixing = policySocialDistancing ? ageSocialMixingDistancing : ageSocialMixingBaseline
+#     # Add baseline interactions only between non-isolated people
+#     for k1 in [1, 4]
+#         for k2 in [1, 4]
+#             ageIsoContractionRate[:,k1,:] .+= reshape(
+#                   ( einsum("ijl,j->i",
+#                     stateTensor[:,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)) * # all infected in non-isolation
+#                     curNonIsolatedSocialMixing
+#                   ),
+#                 (1, size(curNonIsolatedSocialMixing)[1]...)
+#             )
+#         end
+#     end
+#     if policyImmunityPassports
+#         # If the immunity passports policy is on, everyone who tested antibody positive, can roam freely
+#         # Therefore replace the interactions between people with testingState = 2 with ageSocialMixingBaseline
+#         # we do this by using the distributive property of matrix multiplication, and adding extra interactions
+#         # "ageSocialMixingBaseline"-"curNonIsolatedSocialMixing" with each other (this is zero if no social distancing!)
+#         # TODO - this is a bit hacky?, but probably correct - double check though!
+#         for k1 in [1, 4]
+#             for k2 in [1, 4]
+#                 ageIsoContractionRate[3:end,k1,:] .+=
+#                          einsum("ijk,j->ik",
+#                          stateTensor[3:end,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-isolation
+#                          (ageSocialMixingBaseline.-curNonIsolatedSocialMixing)
+#             end
+#         end
+#     end
+#     # Add isolation interactions only between isolated and non-isolated people
+#     # non-isolated contracting it from isolated
+#     for k1 in [1, 4]
+#         ageIsoContractionRate[:,k1,:] .+= reshape(
+#               (einsum("ijl,j->i",
+#                stateTensor[:,2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in isolation
+#                ageSocialMixingIsolation
+#               ),
+#             (1, size(ageSocialMixingIsolation )[1]...)
+#         )
+#     end
+#     # isolated contracting it from non-isolated
+#     for k1 in [1, 4]
+#         ageIsoContractionRate[:,1,:] .+= reshape(
+#                (einsum("ijl,j->i",
+#                 stateTensor[:,k1,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-hospital, non-isolation
+#                 ageSocialMixingIsolation
+#                ),
+#             (1, size(ageSocialMixingIsolation )[1]...)
+#         )
+#     end
+#         # isolated cannot contracting it from another isolated
+#     # Add in-hospital infections (of hospitalised patients, and staff)
+#     #--------------------------------
+#     # (TODO - within hospitals we probably want to take into effect the testing state;
+#     #      tested people are better isolated and there's less mixing)
+#     ageIsoContractionRate[:,3:end,:] .+= reshape(
+#                   withinHospitalSocialMixing *
+#                   einsum("ijkl,j->i",
+#                  stateTensor[:,3:end,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)), # all infected in hospital (sick or working)
+#         (1, 1, size(stateTensor)[end]...)
+#         )
+#     return ageIsoContractionRate/sum(stateTensor) # Normalise the rate by total population
+# end
 
-    nTest, nIso, nHS, nAge, nI = kwargs[:nTest], kwargs[:nIso], kwargs[:nHS],
-                                 kwargs[:nAge] , kwargs[:nI]
-    ageIsoContractionRate = zeros((nTest, nIso, nAge))
-    # Add non-hospital infections
-    #--------------------------------
-    curNonIsolatedSocialMixing = policySocialDistancing ? ageSocialMixingDistancing : ageSocialMixingBaseline
-    # Add baseline interactions only between non-isolated people
-    for k1 in [1, 4]
-        for k2 in [1, 4]
-            ageIsoContractionRate[:,k1,:] .+= reshape(
-                  ( einsum("ijl,j->i",
-                    stateTensor[:,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)) * # all infected in non-isolation
-                    curNonIsolatedSocialMixing
-                  ),
-                (1, size(curNonIsolatedSocialMixing)[1]...)
-            )
-        end
-    end
-    if policyImmunityPassports
-        # If the immunity passports policy is on, everyone who tested antibody positive, can roam freely
-        # Therefore replace the interactions between people with testingState = 2 with ageSocialMixingBaseline
-        # we do this by using the distributive property of matrix multiplication, and adding extra interactions
-        # "ageSocialMixingBaseline"-"curNonIsolatedSocialMixing" with each other (this is zero if no social distancing!)
-        # TODO - this is a bit hacky?, but probably correct - double check though!
-        for k1 in [1, 4]
-            for k2 in [1, 4]
-                ageIsoContractionRate[3:end,k1,:] .+=
-                         einsum("ijk,j->ik",
-                         stateTensor[3:end,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-isolation
-                         (ageSocialMixingBaseline.-curNonIsolatedSocialMixing)
-            end
-        end
-    end
-    # Add isolation interactions only between isolated and non-isolated people
-    # non-isolated contracting it from isolated
-    for k1 in [1, 4]
-        ageIsoContractionRate[:,k1,:] .+= reshape(
-              (einsum("ijl,j->i",
-               stateTensor[:,2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in isolation
-               ageSocialMixingIsolation
-              ),
-            (1, size(ageSocialMixingIsolation )[1]...)
-        )
-    end
-    # isolated contracting it from non-isolated
-    for k1 in [1, 4]
-        ageIsoContractionRate[:,1,:] .+= reshape(
-               (einsum("ijl,j->i",
-                stateTensor[:,k1,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-hospital, non-isolation
-                ageSocialMixingIsolation
-               ),
-            (1, size(ageSocialMixingIsolation )[1]...)
-        )
-    end
-        # isolated cannot contracting it from another isolated
-    # Add in-hospital infections (of hospitalised patients, and staff)
-    #--------------------------------
-    # (TODO - within hospitals we probably want to take into effect the testing state;
-    #      tested people are better isolated and there's less mixing)
-    ageIsoContractionRate[:,3:end,:] .+= reshape(
-                  withinHospitalSocialMixing *
-                  einsum("ijkl,j->i",
-                 stateTensor[:,3:end,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)), # all infected in hospital (sick or working)
-        (1, 1, size(stateTensor)[end]...)
-        )
-    return ageIsoContractionRate/sum(stateTensor) # Normalise the rate by total population
+@with_kw mutable struct trFunc_newInfections_Complete
+  ageSocialMixingBaseline::Array=
+    ageSocialMixingBaseline
+  ageSocialMixingDistancing::Array=
+    ageSocialMixingDistancing
+  ageSocialMixingIsolation::Array=
+    ageSocialMixingIsolation
+  withinHospitalSocialMixing::Float64=
+    withinHospitalSocialMixing
+  transmissionInfectionStage::Array=
+    transmissionInfectionStage
 end
 
-function trFunc_travelInfectionRate_ageAdjusted(
-	     t::Int64, # Time within simulation
-	     travelMaxTime::Int64 = 200,
-	     travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
-	     travelDecline_mean::Float64 = 15.0,
-	     travelDecline_slope::Float64 = 1.0,
-	     travelInfection_peak::Float64 = 1e-1,
-	     travelInfection_maxloc::Float64 = 10.0,
-	     travelInfection_shape::Float64 = 2.0;
-	     kwargs...
-         )
-	tmpTime = [0:1:travelMaxTime-1;]
-	# nAge x T TODO get some realistic data on this
-	travelAgeRateByTime = travelBaseRate .* (agePopulationRatio * transpose(1 .- map(logistic,
-                        (tmpTime .- travelDecline_mean) ./ travelDecline_slope)))
+function (f::trFunc_newInfections_Complete)(
+    stateTensor,
+    policySocialDistancing::Bool, # True / False, no default because it's important to know which one we use at any moment!
+    policyImmunityPassports::Bool, # True / False, no default because it's important to know which one we use at any moment!
+    ageSocialMixingBaseline::Array=
+    ageSocialMixingBaseline,
+    ageSocialMixingDistancing::Array=
+    ageSocialMixingDistancing,
+    ageSocialMixingIsolation::Array=
+    ageSocialMixingIsolation,
+    withinHospitalSocialMixing::Float64=
+    withinHospitalSocialMixing,
+    transmissionInfectionStage::Array=
+    transmissionInfectionStage;
+    kwargs...
+  )
+  f.ageSocialMixingBaseline=ageSocialMixingBaseline
+  f.ageSocialMixingDistancing=ageSocialMixingDistancing
+  f.ageSocialMixingIsolation=ageSocialMixingIsolation
+  f.withinHospitalSocialMixing=withinHospitalSocialMixing
+  f.transmissionInfectionStage=transmissionInfectionStage
 
-    # 1 x T TODO get some realistic data on this, maybe make it age weighted
-    _scale = travelInfection_maxloc / (travelInfection_shape-1)
-    travelContractionRateByTime = map(x -> gammapdf(travelInfection_shape, 1.0,
-                                            x/_scale), tmpTime)
-    travelContractionRateByTime ./= _scale
-    travelContractionRateByTime ./= max(travelContractionRateByTime...)
-    travelContractionRateByTime .*= travelInfection_peak
+  nTest, nIso, nHS, nAge, nI = kwargs[:nTest], kwargs[:nIso], kwargs[:nHS],
+                               kwargs[:nAge] , kwargs[:nI]
+  ageIsoContractionRate = zeros((nTest, nIso, nAge))
+  # Add non-hospital infections
+  #--------------------------------
+  curNonIsolatedSocialMixing = policySocialDistancing ? ageSocialMixingDistancing : ageSocialMixingBaseline
+  # Add baseline interactions only between non-isolated people
+  for k1 in [1, 4]
+      for k2 in [1, 4]
+          ageIsoContractionRate[:,k1,:] .+= reshape(
+                ( einsum("ijl,j->i",
+                  stateTensor[:,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)) * # all infected in non-isolation
+                  curNonIsolatedSocialMixing
+                ),
+              (1, size(curNonIsolatedSocialMixing)[1]...)
+          )
+      end
+  end
+  if policyImmunityPassports
+      # If the immunity passports policy is on, everyone who tested antibody positive, can roam freely
+      # Therefore replace the interactions between people with testingState = 2 with ageSocialMixingBaseline
+      # we do this by using the distributive property of matrix multiplication, and adding extra interactions
+      # "ageSocialMixingBaseline"-"curNonIsolatedSocialMixing" with each other (this is zero if no social distancing!)
+      # TODO - this is a bit hacky?, but probably correct - double check though!
+      for k1 in [1, 4]
+          for k2 in [1, 4]
+              ageIsoContractionRate[3:end,k1,:] .+=
+                       einsum("ijk,j->ik",
+                       stateTensor[3:end,k2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-isolation
+                       (ageSocialMixingBaseline.-curNonIsolatedSocialMixing)
+          end
+      end
+  end
+  # Add isolation interactions only between isolated and non-isolated people
+  # non-isolated contracting it from isolated
+  for k1 in [1, 4]
+      ageIsoContractionRate[:,k1,:] .+= reshape(
+            (einsum("ijl,j->i",
+             stateTensor[:,2,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in isolation
+             ageSocialMixingIsolation
+            ),
+          (1, size(ageSocialMixingIsolation )[1]...)
+      )
+  end
+  # isolated contracting it from non-isolated
+  for k1 in [1, 4]
+      ageIsoContractionRate[:,1,:] .+= reshape(
+             (einsum("ijl,j->i",
+              stateTensor[:,k1,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage))* # all infected in non-hospital, non-isolation
+              ageSocialMixingIsolation
+             ),
+          (1, size(ageSocialMixingIsolation )[1]...)
+      )
+  end
+      # isolated cannot contracting it from another isolated
+  # Add in-hospital infections (of hospitalised patients, and staff)
+  #--------------------------------
+  # (TODO - within hospitals we probably want to take into effect the testing state;
+  #      tested people are better isolated and there's less mixing)
+  ageIsoContractionRate[:,3:end,:] .+= reshape(
+                withinHospitalSocialMixing *
+                einsum("ijkl,j->i",
+               stateTensor[:,3:end,2:(nI+1),:], transmissionInfectionStage, eltype(transmissionInfectionStage)), # all infected in hospital (sick or working)
+      (1, 1, size(stateTensor)[end]...)
+      )
+  return ageIsoContractionRate/sum(stateTensor) # Normalise the rate by total population
+end
 
-    if t >= size(travelAgeRateByTime)[end]
-        return zeros(size(travelAgeRateByTime)[1])
-    else
-        return travelAgeRateByTime[:,t+1] * travelContractionRateByTime[t+1]
-    end
+# function trFunc_travelInfectionRate_ageAdjusted(
+# 	     t::Int64, # Time within simulation
+# 	     travelMaxTime::Int64 = 200,
+# 	     travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
+# 	     travelDecline_mean::Float64 = 15.0,
+# 	     travelDecline_slope::Float64 = 1.0,
+# 	     travelInfection_peak::Float64 = 1e-1,
+# 	     travelInfection_maxloc::Float64 = 10.0,
+# 	     travelInfection_shape::Float64 = 2.0;
+# 	     kwargs...
+#          )
+# 	tmpTime = [0:1:travelMaxTime-1;]
+# 	# nAge x T TODO get some realistic data on this
+# 	travelAgeRateByTime = travelBaseRate .* (agePopulationRatio * transpose(1 .- map(logistic,
+#                         (tmpTime .- travelDecline_mean) ./ travelDecline_slope)))
+#
+#     # 1 x T TODO get some realistic data on this, maybe make it age weighted
+#     _scale = travelInfection_maxloc / (travelInfection_shape-1)
+#     travelContractionRateByTime = map(x -> gammapdf(travelInfection_shape, 1.0,
+#                                             x/_scale), tmpTime)
+#     travelContractionRateByTime ./= _scale
+#     travelContractionRateByTime ./= max(travelContractionRateByTime...)
+#     travelContractionRateByTime .*= travelInfection_peak
+#
+#     if t >= size(travelAgeRateByTime)[end]
+#         return zeros(size(travelAgeRateByTime)[1])
+#     else
+#         return travelAgeRateByTime[:,t+1] * travelContractionRateByTime[t+1]
+#     end
+# end
+
+@with_kw mutable struct trFunc_travelInfectionRate_ageAdjusted
+  travelMaxTime::Int64 = 200
+  travelBaseRate::Float64 = 5e-4 # How many people normally travel back
+                                 # to the country per day # TODO - get data
+  travelDecline_mean::Float64 = 15.0
+  travelDecline_slope::Float64 = 1.0
+  travelInfection_peak::Float64 = 1e-1
+  travelInfection_maxloc::Float64 = 10.0
+  travelInfection_shape::Float64 = 2.0
+end
+
+function (f::trFunc_travelInfectionRate_ageAdjusted)(
+    t::Int64, # Time within simulation
+    travelMaxTime::Int64 = 200,
+    travelBaseRate::Float64 = 5e-4, # How many people normally travel back to the country per day # TODO - get data
+    travelDecline_mean::Float64 = 15.0,
+    travelDecline_slope::Float64 = 1.0,
+    travelInfection_peak::Float64 = 1e-1,
+    travelInfection_maxloc::Float64 = 10.0,
+    travelInfection_shape::Float64 = 2.0;
+    kwargs...
+  )
+  f.travelMaxTime=travelMaxTime
+  f.travelBaseRate=travelBaseRate
+  f.travelDecline_mean=travelDecline_mean
+  f.travelDecline_slope=travelDecline_slope
+  f.travelInfection_peak=travelInfection_peak
+  f.travelInfection_maxloc=travelInfection_maxloc
+  f.travelInfection_shape=travelInfection_shape
+  tmpTime = [0:1:travelMaxTime-1;]
+  # nAge x T TODO get some realistic data on this
+  travelAgeRateByTime = travelBaseRate .* (agePopulationRatio * transpose(1 .- map(logistic,
+                      (tmpTime .- travelDecline_mean) ./ travelDecline_slope)))
+
+  # 1 x T TODO get some realistic data on this, maybe make it age weighted
+  _scale = travelInfection_maxloc / (travelInfection_shape-1)
+  travelContractionRateByTime = map(x -> gammapdf(travelInfection_shape, 1.0,
+                                          x/_scale), tmpTime)
+  travelContractionRateByTime ./= _scale
+  travelContractionRateByTime ./= max(travelContractionRateByTime...)
+  travelContractionRateByTime .*= travelInfection_peak
+
+  if t >= size(travelAgeRateByTime)[end]
+      return zeros(size(travelAgeRateByTime)[1])
+  else
+      return travelAgeRateByTime[:,t+1] * travelContractionRateByTime[t+1]
+  end
 end
 
 # Test parameters
@@ -553,79 +940,234 @@ end
 # TODO - but particular data and references from lit (or estimates based on previous similar tests)
 
 # TODO - MANUAL! - this function is VERY specific to current health state setup, and needs to be manually edited if number of health states change
-function inpFunc_testSpecifications(
-	PCR_FNR_I1_to_R2::Array = [ 0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
+# function inpFunc_testSpecifications(
+# 	PCR_FNR_I1_to_R2::Array = [ 0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
+#     PCR_FPR::Float64 = 0.01,
+#     antigen_FNR_I1_to_R2::Array = [ 0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
+#     antigen_FPR::Float64 = 0.1,
+#     antibody_FNR_I1_to_R2::Array = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05],
+#     antibody_FPR_S_to_I4::Array = [0.05, 0.04, 0.03, 0.02, 0.01];
+#     kwargs...
+#     )
+#
+#     nHS, nI, nR = kwargs[:nHS], kwargs[:nI], kwargs[:nR]
+#
+#     testSpecifications = DataFrame()
+#     testSpecifications.Name = vcat(
+#                     ["PCR" for i in 1:nHS],
+#                     ["Antigen" for i in 1:nHS],
+#                     ["Antibody" for i in 1:nHS]
+#                     )
+#     testSpecifications.OutputTestState = vcat(
+#                     [1 for i in 1:2*nHS],
+#                     [2 for i in 1:nHS]
+#                     )
+#     testSpecifications.TruePosHealthState = vcat(
+#                     [[i for i in 1:nI] for j in 1:2*nHS],
+#                     [[i for i in nI+1:nI+nR] for j in 1:nHS]
+#                     )
+#     # In some health states some people are true negatives and some are true positives! (No, makes litte sense to use, just account for it in FPR? Only matters for test makers...)
+#     # testSpecifications['AmbiguousPosHealthState'] = [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(1, nI+1)]*nHS # what information state does a pos test transition you to.
+#
+#     testSpecifications.InputHealthState = vcat(0:nHS-1, 0:nHS-1, 0:nHS-1)
+#
+#     # These numbers below are "defaults" illustrating the concept, but are modified by the inputs!!!
+#
+#     testSpecifications.FalseNegativeRate = [ # ratio of positive (infected / immune) people missed by the test
+#         # For each health stage:
+#         #  S -> I1 (asymp) -> I2 (mild symp) -> I3 (symp, sick) -> I4 (symp, less sick) -> R1 / R2 (IgM, IgG avail) -> D
+#
+#         # PCR
+#             0.,   0.9,            0.4,           0.15,                0.35,              0.5, 0.8,   0.,
+#
+#         # Antigen
+#             0.,   0.95,           0.6,           0.35,                0.45,              0.6, 0.9,   0.,
+#
+#         # Antibody
+#             0.,   0.99,           0.85,          0.8,                 0.65,              0.3, 0.05,  0.
+#     ]
+#
+#     testSpecifications[2:7, :FalseNegativeRate] .= PCR_FNR_I1_to_R2
+#     testSpecifications[10:15, :FalseNegativeRate] .= antigen_FNR_I1_to_R2
+#     testSpecifications[18:23, :FalseNegativeRate] .= antibody_FNR_I1_to_R2
+#
+#
+#     testSpecifications.FalsePositiveRate = [ # ratio of negative (non-infected or not immune) people deemed positive by the test
+#         # PCR
+#         0.01, 0.,0.,0.,0., 0.01, 0.01, 0.,
+#
+#         # Antigen
+#         0.1, 0.,0.,0.,0., 0.1, 0.1, 0.,
+#
+#         # Antibody
+#         0.05, 0.04, 0.03, 0.02, 0.01, 0., 0., 0.
+#     ]
+#
+#     testSpecifications[1, :FalsePositiveRate] = PCR_FPR
+#     testSpecifications[6:7, :FalsePositiveRate] = PCR_FPR
+#     testSpecifications[9, :FalsePositiveRate] = antigen_FPR
+#     testSpecifications[14:15, :FalsePositiveRate] = antigen_FPR
+#     testSpecifications[17:21, :FalsePositiveRate] .= antibody_FPR_S_to_I4
+#
+#     return testSpecifications
+# end
+
+@with_kw mutable struct inpFunc_testSpecifications
+  PCR_FNR_I1_to_R2::Array = [0.9,  0.4, 0.15, 0.35, 0.5, 0.8]
+  PCR_FPR::Float64 = 0.01
+  antigen_FNR_I1_to_R2::Array = [0.95, 0.6, 0.35, 0.45, 0.6, 0.9]
+  antigen_FPR::Float64 = 0.1
+  antibody_FNR_I1_to_R2::Array = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05]
+  antibody_FPR_S_to_I4::Array = [0.05, 0.04, 0.03, 0.02, 0.01]
+end
+
+function (f::inpFunc_testSpecifications)(
+    PCR_FNR_I1_to_R2::Array = [0.9,  0.4, 0.15, 0.35, 0.5, 0.8],
     PCR_FPR::Float64 = 0.01,
-    antigen_FNR_I1_to_R2::Array = [ 0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
+    antigen_FNR_I1_to_R2::Array = [0.95, 0.6, 0.35, 0.45, 0.6, 0.9],
     antigen_FPR::Float64 = 0.1,
     antibody_FNR_I1_to_R2::Array = [0.99, 0.85, 0.8, 0.65, 0.3, 0.05],
     antibody_FPR_S_to_I4::Array = [0.05, 0.04, 0.03, 0.02, 0.01];
     kwargs...
-    )
+  )
+  f.PCR_FNR_I1_to_R2=PCR_FNR_I1_to_R2
+  f.PCR_FPR=PCR_FPR
+  f.antigen_FNR_I1_to_R2=antigen_FNR_I1_to_R2
+  f.antigen_FPR=antigen_FPR
+  f.antibody_FNR_I1_to_R2=antibody_FNR_I1_to_R2
+  f.antibody_FPR_S_to_I4=antibody_FPR_S_to_I4
+  nHS, nI, nR = kwargs[:nHS], kwargs[:nI], kwargs[:nR]
 
-    nHS, nI, nR = kwargs[:nHS], kwargs[:nI], kwargs[:nR]
+  testSpecifications = DataFrame()
+  testSpecifications.Name = vcat(
+                  ["PCR" for i in 1:nHS],
+                  ["Antigen" for i in 1:nHS],
+                  ["Antibody" for i in 1:nHS]
+                  )
+  testSpecifications.OutputTestState = vcat(
+                  [1 for i in 1:2*nHS],
+                  [2 for i in 1:nHS]
+                  )
+  testSpecifications.TruePosHealthState = vcat(
+                  [[i for i in 1:nI] for j in 1:2*nHS],
+                  [[i for i in nI+1:nI+nR] for j in 1:nHS]
+                  )
+  # In some health states some people are true negatives and some are true positives! (No, makes litte sense to use, just account for it in FPR? Only matters for test makers...)
+  # testSpecifications['AmbiguousPosHealthState'] = [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(1, nI+1)]*nHS # what information state does a pos test transition you to.
 
-    testSpecifications = DataFrame()
-    testSpecifications.Name = vcat(
-                    ["PCR" for i in 1:nHS],
-                    ["Antigen" for i in 1:nHS],
-                    ["Antibody" for i in 1:nHS]
-                    )
-    testSpecifications.OutputTestState = vcat(
-                    [1 for i in 1:2*nHS],
-                    [2 for i in 1:nHS]
-                    )
-    testSpecifications.TruePosHealthState = vcat(
-                    [[i for i in 1:nI] for j in 1:2*nHS],
-                    [[i for i in nI+1:nI+nR] for j in 1:nHS]
-                    )
-    # In some health states some people are true negatives and some are true positives! (No, makes litte sense to use, just account for it in FPR? Only matters for test makers...)
-    # testSpecifications['AmbiguousPosHealthState'] = [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(nI+1, nI+nR+1)]*nHS + [np.arange(1, nI+1)]*nHS # what information state does a pos test transition you to.
+  testSpecifications.InputHealthState = vcat(0:nHS-1, 0:nHS-1, 0:nHS-1)
 
-    testSpecifications.InputHealthState = vcat(0:nHS-1, 0:nHS-1, 0:nHS-1)
+  # These numbers below are "defaults" illustrating the concept, but are modified by the inputs!!!
 
-    # These numbers below are "defaults" illustrating the concept, but are modified by the inputs!!!
+  testSpecifications.FalseNegativeRate = [ # ratio of positive (infected / immune) people missed by the test
+      # For each health stage:
+      #  S -> I1 (asymp) -> I2 (mild symp) -> I3 (symp, sick) -> I4 (symp, less sick) -> R1 / R2 (IgM, IgG avail) -> D
 
-    testSpecifications.FalseNegativeRate = [ # ratio of positive (infected / immune) people missed by the test
-        # For each health stage:
-        #  S -> I1 (asymp) -> I2 (mild symp) -> I3 (symp, sick) -> I4 (symp, less sick) -> R1 / R2 (IgM, IgG avail) -> D
+      # PCR
+          0.,   0.9,            0.4,           0.15,                0.35,              0.5, 0.8,   0.,
 
-        # PCR
-            0.,   0.9,            0.4,           0.15,                0.35,              0.5, 0.8,   0.,
+      # Antigen
+          0.,   0.95,           0.6,           0.35,                0.45,              0.6, 0.9,   0.,
 
-        # Antigen
-            0.,   0.95,           0.6,           0.35,                0.45,              0.6, 0.9,   0.,
+      # Antibody
+          0.,   0.99,           0.85,          0.8,                 0.65,              0.3, 0.05,  0.
+  ]
 
-        # Antibody
-            0.,   0.99,           0.85,          0.8,                 0.65,              0.3, 0.05,  0.
-    ]
-
-    testSpecifications[2:7, :FalseNegativeRate] .= PCR_FNR_I1_to_R2
-    testSpecifications[10:15, :FalseNegativeRate] .= antigen_FNR_I1_to_R2
-    testSpecifications[18:23, :FalseNegativeRate] .= antibody_FNR_I1_to_R2
+  testSpecifications[2:7, :FalseNegativeRate] .= PCR_FNR_I1_to_R2
+  testSpecifications[10:15, :FalseNegativeRate] .= antigen_FNR_I1_to_R2
+  testSpecifications[18:23, :FalseNegativeRate] .= antibody_FNR_I1_to_R2
 
 
-    testSpecifications.FalsePositiveRate = [ # ratio of negative (non-infected or not immune) people deemed positive by the test
-        # PCR
-        0.01, 0.,0.,0.,0., 0.01, 0.01, 0.,
+  testSpecifications.FalsePositiveRate = [ # ratio of negative (non-infected or not immune) people deemed positive by the test
+      # PCR
+      0.01, 0.,0.,0.,0., 0.01, 0.01, 0.,
 
-        # Antigen
-        0.1, 0.,0.,0.,0., 0.1, 0.1, 0.,
+      # Antigen
+      0.1, 0.,0.,0.,0., 0.1, 0.1, 0.,
 
-        # Antibody
-        0.05, 0.04, 0.03, 0.02, 0.01, 0., 0., 0.
-    ]
+      # Antibody
+      0.05, 0.04, 0.03, 0.02, 0.01, 0., 0., 0.
+  ]
 
-    testSpecifications[1, :FalsePositiveRate] = PCR_FPR
-    testSpecifications[6:7, :FalsePositiveRate] = PCR_FPR
-    testSpecifications[9, :FalsePositiveRate] = antigen_FPR
-    testSpecifications[14:15, :FalsePositiveRate] = antigen_FPR
-    testSpecifications[17:21, :FalsePositiveRate] .= antibody_FPR_S_to_I4
+  testSpecifications[1, :FalsePositiveRate] = PCR_FPR
+  testSpecifications[6:7, :FalsePositiveRate] = PCR_FPR
+  testSpecifications[9, :FalsePositiveRate] = antigen_FPR
+  testSpecifications[14:15, :FalsePositiveRate] = antigen_FPR
+  testSpecifications[17:21, :FalsePositiveRate] .= antibody_FPR_S_to_I4
 
-    return testSpecifications
+  return testSpecifications
 end
 
-function trFunc_testCapacity(
+# function trFunc_testCapacity(
+#     realTime::Date, # time within simulation (day)
+#     # PCR capacity - initial
+#     testCapacity_pcr_phe_total::Float64 = 1e4,
+#     testCapacity_pcr_phe_inflexday::Date = Date("2020-03-25", "yyyy-mm-dd"),
+#     testCapacity_pcr_phe_inflexslope::Float64 = 5.0,
+#
+#     # PCR capacity - increased
+#     testCapacity_pcr_country_total::Float64 = 1e5,
+#     testCapacity_pcr_country_inflexday::Date = Date("2020-04-25", "yyyy-mm-dd"),
+#     testCapacity_pcr_country_inflexslope::Float64 = 10.0,
+#
+#     # Antibody / antigen capacity
+#     testCapacity_antibody_country_firstday::Date = Date("2020-04-25", "yyyy-mm-dd"),
+#
+#     testCapacity_antibody_country_total::Float64 = 5e6,
+#     testCapacity_antibody_country_inflexday::Date = Date("2020-05-20", "yyyy-mm-dd"),
+#     testCapacity_antibody_country_inflexslope::Float64 = 20.0,
+#
+# 	testCapacity_antigenratio_country::Float64 = 0.7;
+#
+# 	kwargs...
+# 	)
+#
+#     # Returns a dictionary with test names and number available at day "t"
+#     outPCR = (
+#         #phe phase
+#         testCapacity_pcr_phe_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_phe_inflexday))/testCapacity_pcr_phe_inflexslope)
+#         +
+#         #whole country phase
+#         testCapacity_pcr_country_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_country_inflexday))/testCapacity_pcr_country_inflexslope)
+#     )
+#
+#
+#     if realTime<testCapacity_antibody_country_firstday
+#         outAntiTotal = 0.0
+#     else
+#         outAntiTotal = (
+#             testCapacity_antibody_country_total * logistic(Dates.value(Day(realTime-testCapacity_antibody_country_inflexday))/testCapacity_antibody_country_inflexslope)
+# 		)
+# 	end
+#
+#     return Dict([
+#         ("PCR", outPCR),
+#         ("Antigen", outAntiTotal*testCapacity_antigenratio_country),
+#         ("Antibody", outAntiTotal*(1-testCapacity_antigenratio_country))
+# 	]) # Tuples can be used instead (using dictionary to make it identical to python code
+# end
+
+@with_kw mutable struct trFunc_testCapacity
+  testCapacity_pcr_phe_total::Float64 = 1e4
+  testCapacity_pcr_phe_inflexday::Date = Date("2020-03-25", "yyyy-mm-dd")
+  testCapacity_pcr_phe_inflexslope::Float64 = 5.0
+
+  # PCR capacity - increased
+  testCapacity_pcr_country_total::Float64 = 1e5
+  testCapacity_pcr_country_inflexday::Date = Date("2020-04-25", "yyyy-mm-dd")
+  testCapacity_pcr_country_inflexslope::Float64 = 10.0
+
+  # Antibody / antigen capacity
+  testCapacity_antibody_country_firstday::Date = Date("2020-04-25", "yyyy-mm-dd")
+
+  testCapacity_antibody_country_total::Float64 = 5e6
+  testCapacity_antibody_country_inflexday::Date = Date("2020-05-20", "yyyy-mm-dd")
+  testCapacity_antibody_country_inflexslope::Float64 = 20.0
+
+  testCapacity_antigenratio_country::Float64 = 0.7
+end
+
+function (f::trFunc_testCapacity)(
     realTime::Date, # time within simulation (day)
     # PCR capacity - initial
     testCapacity_pcr_phe_total::Float64 = 1e4,
@@ -644,32 +1186,44 @@ function trFunc_testCapacity(
     testCapacity_antibody_country_inflexday::Date = Date("2020-05-20", "yyyy-mm-dd"),
     testCapacity_antibody_country_inflexslope::Float64 = 20.0,
 
-	testCapacity_antigenratio_country::Float64 = 0.7;
+    testCapacity_antigenratio_country::Float64 = 0.7;
 
-	kwargs...
-	)
+    kwargs...
+  )
 
-    # Returns a dictionary with test names and number available at day "t"
-    outPCR = (
-        #phe phase
-        testCapacity_pcr_phe_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_phe_inflexday))/testCapacity_pcr_phe_inflexslope)
-        +
-        #whole country phase
-        testCapacity_pcr_country_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_country_inflexday))/testCapacity_pcr_country_inflexslope)
-    )
+  f.testCapacity_pcr_phe_total=testCapacity_pcr_phe_total
+  f.testCapacity_pcr_phe_inflexday=testCapacity_pcr_phe_inflexday
+  f.testCapacity_pcr_phe_inflexslope=testCapacity_pcr_phe_inflexslope
+  f.testCapacity_pcr_country_total=testCapacity_pcr_country_total
+  f.testCapacity_pcr_country_inflexday=testCapacity_pcr_country_inflexday
+  f.testCapacity_pcr_country_inflexslope=testCapacity_pcr_country_inflexslope
+  f.testCapacity_antibody_country_firstday=testCapacity_antibody_country_firstday
+  f.testCapacity_antibody_country_total=testCapacity_antibody_country_total
+  f.testCapacity_antibody_country_inflexday=testCapacity_antibody_country_inflexday
+  f.testCapacity_antibody_country_inflexslope=testCapacity_antibody_country_inflexslope
+  f.testCapacity_antigenratio_country=testCapacity_antigenratio_country
+
+  # Returns a dictionary with test names and number available at day "t"
+  outPCR = (
+      #phe phase
+      testCapacity_pcr_phe_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_phe_inflexday))/testCapacity_pcr_phe_inflexslope)
+      +
+      #whole country phase
+      testCapacity_pcr_country_total * logistic(Dates.value(Day(realTime-testCapacity_pcr_country_inflexday))/testCapacity_pcr_country_inflexslope)
+  )
 
 
-    if realTime<testCapacity_antibody_country_firstday
-        outAntiTotal = 0.0
-    else
-        outAntiTotal = (
-            testCapacity_antibody_country_total * logistic(Dates.value(Day(realTime-testCapacity_antibody_country_inflexday))/testCapacity_antibody_country_inflexslope)
-		)
-	end
+  if realTime<testCapacity_antibody_country_firstday
+      outAntiTotal = 0.0
+  else
+      outAntiTotal = (
+          testCapacity_antibody_country_total * logistic(Dates.value(Day(realTime-testCapacity_antibody_country_inflexday))/testCapacity_antibody_country_inflexslope)
+  )
+  end
 
-    return Dict([
-        ("PCR", outPCR),
-        ("Antigen", outAntiTotal*testCapacity_antigenratio_country),
-        ("Antibody", outAntiTotal*(1-testCapacity_antigenratio_country))
-	]) # Tuples can be used instead (using dictionary to make it identical to python code
+  return Dict([
+      ("PCR", outPCR),
+      ("Antigen", outAntiTotal*testCapacity_antigenratio_country),
+      ("Antibody", outAntiTotal*(1-testCapacity_antigenratio_country))
+  ]) # Tuples can be used instead (using dictionary to make it identical to python code
 end

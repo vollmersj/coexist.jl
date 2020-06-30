@@ -6,6 +6,9 @@ using LinearAlgebra
 using Dates
 import StatsFuns: logistic, gammapdf
 using PyCall
+using Parameters
+
+abstract type CType end
 
 const DATA_DIR = joinpath(dirname(@__FILE__), "..", "data")
 
